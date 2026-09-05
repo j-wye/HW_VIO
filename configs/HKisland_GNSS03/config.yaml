@@ -7,13 +7,15 @@
 # beyond 3x the median or 1.5x the previous file's worst).
 # Every number below was produced by this exact file (comments aside).
 #
-# This file : SE3 median 16.27 m (11.0-28.6), 1 s drift 0.912 m, inject 6.09 Hz, lever-arm excursion median 1.24 m, sigma/err (head) 35.93
-#              offsets [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.8], GT clock offset +0.00 s
-# Previous  : SE3 median 30.65 m (11.7-89.7), 1 s drift 1.411 m  (results/harness/HKisland_GNSS03/base10.json)
-#              change -46.9 %, better on 6/10 paired offsets, guards all pass
+# This file : SE3 median 15.03 m (11.2-33.3), 1 s drift 0.747 m, inject 6.04 Hz, lever-arm excursion median 0.97 m, sigma/err (head) 45.73
+#              offsets [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9], GT clock offset +0.00 s
+# Previous  : SE3 median 30.65 m (11.7-89.7), 1 s drift 1.612 m  (results/harness/HKisland_GNSS03/base10.json)
+#              change -51.0 %, better on 7/10 paired offsets, guards all pass
 # Changed vs previous:
-#   optical_flow_pyramid_levels = 4   -- 4 KLT pyramid levels: 30.65 -> 16.27 m median (-47 %), worst offset 90 -> 29 m, 1 s drift 1.41 -> 0.91 m. Same camera and route as HKisland03, where the same change is also the strongest single axis; the coastal/low-texture imagery tracks better with the coarser level
-# Re-checked one-at-a-time under the protocol and kept: accelerometer_noise_density 3.3e-3 (1e-2: -44 % over 5 offsets but +1 % over 10 -- luck, and two offsets fail), curvature_correction true (false + accND 1e-2 ties the median at 16.74 but with a 71 m tail; on top of pyramid 4 it is worse, 18.47), num_clones 11 (13 diverges on two offsets in combination), min_angle_deg 2.0 (1.5 fails drift/tail), pixel_standerd_deviation 4.0, min_track_length 4, features 120/120, feature_max_depth 300, frontend delta_px 4 / fire_frac 0.1 / max_dt 0.5 / min_inject 4, extrinsics_std 0.1, fast_threshold 20, equalization histogram, ransac 0.5. This is the hardest of the four sequences (airframe vibration 24-43 % above HKisland03; the filter is ~35x overconfident here)
+#   curvature_correction = false   -- second-order update correction off: -27 % alone here and the one change that never hurts the other sequences
+#   accelerometer_noise_density = 1.0e-2   -- filter trusts the IMU less: this flight has 24-43 % more airframe vibration than HKisland03 on the same route (docs/05), and the fixed-set base is ~30x overconfident here; -3 % alone, -45 % with curvature off
+#   num_clones = 13   -- 13 clones: same route and camera as HKisland03 where 13 is also the strongest axis; on top of the two changes above 16.74 -> 15.03 m and 1 s drift 1.00 -> 0.75 m. Sequence-specific (collapses AMtown03)
+# Re-checked one-at-a-time under the protocol and kept: optical_flow_pyramid_levels 3 (4 alone is 16.27 m, the runner-up; on top of this triple it is worse), min_angle_deg 2.0 (1.5 fails drift and tail), pixel_standerd_deviation 4.0, min_track_length 4, features 120/120, feature_max_depth 300, frontend delta_px 4 / fire_frac 0.1 / max_dt 0.5 / min_inject 4, extrinsics_std 0.1, fast_threshold 20, equalization histogram, ransac 0.5. Hardest of the four sequences; the filter's own covariance is ~45x optimistic here, so its accuracy score will need the largest calibration
 # Full leaderboard: results/harness/HKisland_GNSS03/leaderboard.md
 # ============================================================================
 # MSCEqF filter config -- HKisland_GNSS03
@@ -31,7 +33,7 @@ extrinsics_std: [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1]   # physical pr
 intrinsics_std:    [1.0, 1.0, 1.0, 1.0]
 
 # ---- IMU noise (Livox Avia built-in BMI088, /imu/data)
-accelerometer_noise_density: 3.300e-03
+accelerometer_noise_density: 1.0e-2
 accelerometer_random_walk:   2.000e-03
 gyroscope_noise_density:     2.400e-04
 gyroscope_random_walk:       2.000e-05
@@ -73,7 +75,7 @@ feature_refinement_tollerance: 1e-10
 measurement_projection_method: unit_plane
 feature_representation: anchored_inverse_depth
 pixel_standerd_deviation: 4.0    # sic (MSCEqF key name)
-curvature_correction: true
+curvature_correction: false
 min_track_length: 4
 min_angle_deg: 2.0
 zero_velocity_update: enabled
@@ -81,7 +83,7 @@ zero_velocity_update: enabled
 # ---- state
 enable_camera_intrinsic_calibration: false
 gravity: 9.81                    # m/s^2 -- /imu/data must be converted from g first
-num_clones: 11
+num_clones: 13
 num_persistent_features: 0
 
 # ---- tracker
@@ -89,7 +91,7 @@ equalization_method: histogram
 feature_detector: fast
 fast_threshold: 20
 shi_tomasi_quality_level: 0.75   # only read when feature_detector is shi-tomasi
-optical_flow_pyramid_levels: 4
+optical_flow_pyramid_levels: 3
 optical_flow_win_size: 21
 detector_pyramid_levels: 1
 grid_x_size: 4
