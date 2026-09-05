@@ -5,10 +5,10 @@
 | 사용 | 시퀀스 | calib 그룹 | timeshift | 제원 |
 |---|---|---|---|---|
 | ✅ | [`AMtown03`](AMtown03/) | AMtown | -0.067 | 620 s, cruise **11.9 m/s** |
-| ⛔ | [`AMvalley03`](AMvalley03/) | AMvalley | -0.066 | 546 s, cruise **12.0 m/s** |
-| ⛔ | [`HKisland03`](HKisland03/) | HKisland | -0.092 | 380 s, cruise **9.0 m/s** |
+| ✅ | [`AMvalley03`](AMvalley03/) | AMvalley | -0.066 | 546 s, cruise **12.0 m/s** |
+| ✅ | [`HKisland03`](HKisland03/) | HKisland | -0.092 | 380 s, cruise **9.0 m/s** |
 | ⛔ | [`HKairport03`](HKairport03/) | HKairport | -0.09 | 366 s, cruise **8.6 m/s** |
-| ⛔ | [`HKisland_GNSS03`](HKisland_GNSS03/) | HK_GNSS | -0.092 | 391 s, cruise **9.0 m/s** |
+| ✅ | [`HKisland_GNSS03`](HKisland_GNSS03/) | HK_GNSS | -0.092 | 391 s, cruise **9.0 m/s** |
 | ⛔ | [`HKairport_GNSS03`](HKairport_GNSS03/) | HK_GNSS | -0.089 | 397 s, cruise 7.1 m/s |
 
 각 폴더에 `config.yaml` 하나와 `README.md`. 시퀀스마다 config는 하나만 둔다 — 탐색 중 생기는 변형은 다른 이름으로 만들고,
