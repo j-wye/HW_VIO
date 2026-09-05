@@ -63,7 +63,7 @@ int main(int argc, char** argv)
   out << "t,px,py,pz,qx,qy,qz,qw,vx,vy,vz,bwx,bwy,bwz,bax,bay,baz,"
          "P00,P11,P22,P33,P44,P55,P66,P77,P88\n";
 
-  // assumes a timestamp-sorted store (scripts/sort_bag_db3.py); one forward pass then keeps sensor order.
+  // assumes a timestamp-sorted store; one forward pass then keeps sensor order.
   int64_t t0_ns = -1;
   std::size_t n_img = 0, n_imu = 0, n_pose = 0;
   while (reader.has_next())
