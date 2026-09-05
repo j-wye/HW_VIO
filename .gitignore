@@ -1,0 +1,19 @@
+# 이 저장소 = ROS2 패키지 vio_node (루트가 곧 패키지). ws 루트는 두 단계 위(~/ws)이고 거기서 colcon build.
+
+# colcon이 실수로 저장소 안에서 실행됐을 때 생기는 산출물
+/build/
+/install/
+/log/
+
+# 데이터·실행 출력은 저장소에 넣지 않는다
+*.bag
+*.db3
+*.mcap
+*.csv
+
+# Python / 편집기 / OS
+__pycache__/
+*.pyc
+.vscode/
+*.swp
+.DS_Store

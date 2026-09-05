@@ -1,0 +1,119 @@
+# ============================================================================
+# DEPLOYMENT RECIPE -- AMtown03 calibration + the fixed variable set (2026-09-04)
+# ============================================================================
+# 고정 변수 (수정하지 않음)
+#   --delta-px 4  --fire-frac 0.1  --max-dt 0.5  --min-inject 4  --min-ref 0  (front-end; = run_feeder defaults)
+#   min_angle_deg 2.0, min_track_length 4, pixel_standerd_deviation 4.0
+#   min_features 120, max_features 120        <- the single key that decides whether the gate wins
+#   num_clones 11                              <- paired with the gate; raising it collapses the window
+#   extrinsics_std 0.1 x6                      <- honest prior for a DERIVED extrinsic (10 cm / 0.1 rad).
+#                                                 NOT a performance knob: 1e-2 vs 1e-1 differ within
+#                                                 start-offset chaos (medians 31.4 vs 30.0 over 8 offsets),
+#                                                 the lever arm drifts to metres from cruise start with
+#                                                 any prior (E covariance grows with the nav state), and
+#                                                 >= 0.3 m starts the slack regime. Never metres.
+#   accelerometer_random_walk 2e-3             <- transfers across 3 sequences
+# 기체별 1회 측정 후 고정
+#   T_cam_imu / intrinsics / distortion (calibration), timeshift_cam_imu (measured constant),
+#   gyro/accel noise densities (datasheet or Allan -- never tuned on APE)
+# 배포 기하별
+#   feature_max_depth (300 m is for 80 m AGL; >= 800-2300 m at 500 m), window-time cap at altitude
+#
+# Measured with this exact file, AMtown03, gate ON, 8 start offsets (0..0.5 s):
+#   APE median 29.96 m (range 25.1-60.8), 1 s drift median 1.39 m
+#   versus gate OFF median 45.98 m (44.5-51.5)      -> robust gain ~ -35 %
+# Same recipe (with each sequence's own calibration): AMvalley03 20.05 (OFF 43.9),
+#   HKisland_GNSS03 15.76 (OFF 92.6). Report medians over start offsets, never one run.
+#
+# Run:
+#   ros2 run vio_node run_feeder <bag> <this file> <out.csv>
+#   (no flags. run_feeder IS the feature-keyframe front-end since 2026-09-04 -- there is no
+#    --mode/--tracker/--trigger/--gate to choose -- and its numeric defaults are the fixed set above.)
+# opencv_threads: 1 is kept for bit-reproducible evaluation; use 0 on the vehicle.
+# ============================================================================
+# MSCEqF filter config -- AMtown03
+# Derived from the official calibration.
+#
+# 640x480 is the native 2448x2048 cropped by 106 rows off the top and the bottom
+# (-> 2448x1836 = 4:3) and then scaled uniformly. The sensor is 153:128, so a direct
+# resize would be anamorphic and would invalidate the radtan model.
+# Camera calib: official MARS-LVIG "AMtown" group.
+
+# ---- initial std: attitude, velocity, position | bias | extrinsics | intrinsics
+extended_pose_std: [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-2, 1.0e-2, 1.0e-2]
+bias_std:          [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1]
+extrinsics_std: [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1]
+intrinsics_std:    [1.0, 1.0, 1.0, 1.0]
+
+# ---- IMU noise (Livox Avia built-in BMI088, /imu/data)
+accelerometer_noise_density: 3.300e-03
+accelerometer_random_walk: 0.002
+gyroscope_noise_density:     2.400e-04
+gyroscope_random_walk:       2.000e-05
+
+# ---- camera (Kalibr convention)
+distortion_model: radtan
+distortion_coeffs: [-0.121, 0.1113, 0.0016, 0.00013, -0.062353]   # k1,k2,p1,p2,k3; invariant under the crop + uniform scale, so the official values carry over
+resolution: [640, 480]
+intrinsics: [380.05751634, 379.94248366, 306.08300654, 244.27908497]   # fx, fy, cx, cy
+
+# cam <- IMU (MSCEqF also accepts T_imu_cam and inverts it). Composed from the official
+# cam<-LiDAR extrinsic and the Livox IMU offset; derived, not a Kalibr measurement.
+T_cam_imu:
+  - [ 0.002980882, -0.999727754, -0.023141560,  0.025028594]
+  - [-0.005046360,  0.023126330, -0.999719814,  0.028028620]
+  - [ 0.999982824,  0.003096827, -0.004976049, -0.093077537]
+  - [ 0.000000000,  0.000000000,  0.000000000,  1.000000000]
+
+# Applied as cam.timestamp_ += timeshift_cam_imu, i.e. the value is tau = t_imu - t_cam.
+timeshift_cam_imu: -0.067
+
+# ---- initialiser
+static_initializer_imu_window: 1.0
+static_initializer_acc_threshold: 0.25
+# these keys are checker_*, not the static_initializer_disparity_* of the MSCEqF README
+checker_disparity_window: 0.5
+checker_disparity_threshold: 1.0
+
+# ---- propagator
+state_transition_order: 0        # 0 = first-order, -1 = numerical exp
+imu_buffer_max_size: 1000
+
+# ---- updater
+refine_traingulation: true       # sic (MSCEqF key name)
+feature_min_depth: 0.5
+feature_max_depth: 300.0        # template default of 20 would reject every feature at 80 m AGL
+feature_refinement_max_iterations: 20
+feature_refinement_tollerance: 1e-10
+measurement_projection_method: unit_plane
+feature_representation: anchored_inverse_depth
+pixel_standerd_deviation: 4.0    # sic (MSCEqF key name)
+curvature_correction: true
+min_track_length: 4
+min_angle_deg: 2.0
+zero_velocity_update: enabled
+
+# ---- state
+enable_camera_intrinsic_calibration: false
+gravity: 9.81                    # m/s^2 -- /imu/data must be converted from g first
+num_clones: 11
+num_persistent_features: 0
+
+# ---- tracker
+equalization_method: histogram
+feature_detector: fast
+fast_threshold: 20
+shi_tomasi_quality_level: 0.75   # only read when feature_detector is shi-tomasi
+optical_flow_pyramid_levels: 3
+optical_flow_win_size: 21
+detector_pyramid_levels: 1
+grid_x_size: 4
+grid_y_size: 4
+min_feature_pixel_distance: 15
+min_features: 120
+max_features: 120
+ransac_reprojection: 0.5
+opencv_threads: 1
+
+max_track_length: 400
+logger_level: 1

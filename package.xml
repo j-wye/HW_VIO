@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>vio_node</name>
+  <version>0.1.0</version>
+  <description>Monocular VIO node on the MSCEqF engine, with deterministic offline runners</description>
+
+  <maintainer email="qkrwhddbs26@gmail.com">hanwha-vio</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>rosbag2_cpp</depend>
+  <depend>rosbag2_storage</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>cv_bridge</depend>
+  <depend>libopencv-dev</depend>
+  <depend>boost</depend>
+
+  <!-- rosbag2 sqlite3 storage plugin: run_offline/run_feeder가 bag을 열 때 런타임에 필요 -->
+  <exec_depend>rosbag2_storage_default_plugins</exec_depend>
+  <exec_depend>ros2launch</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

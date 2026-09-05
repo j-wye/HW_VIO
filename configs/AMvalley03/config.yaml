@@ -1,0 +1,88 @@
+# DISABLED -- not part of the evaluation set.
+# Held out of the evaluation set by default; promoting it is a project decision, not a technical blocker. tau IS constant here: measured over 4 windows (60/180/300/420 s) at -0.0671/-0.0663/-0.0628/-0.0659, spread 4.3 ms, against the 198 ms swing that disqualified HKairport_GNSS03. Value adopted = -0.066 (R^2-weighted), which agrees to 1 ms with the -0.067 of AMtown01/03 -- same platform, same field campaign one day earlier -- so the two independent measurements corroborate each other. The two low-R^2 windows are the straight-cruise ones with little roll excitation, not a tau shift. Terrain relief is large (/height vs RTK relative altitude: corr 0.693, residual std 30.5 m, vs 5.7-10.5 m for the AMtown/HKairport bags) -- that is a valley, not a broken sensor, but it makes /height a poor z anchor and a good depth prior here. Cruise 12.0 m/s duplicates AMtown03 (11.9 m/s), so its worth is unseen-terrain generalisation, not a new speed point.
+# MSCEqF filter config -- AMvalley03
+# Derived from the official calibration.
+#
+# 640x480 is the native 2448x2048 cropped by 106 rows off the top and the bottom
+# (-> 2448x1836 = 4:3) and then scaled uniformly. The sensor is 153:128, so a direct
+# resize would be anamorphic and would invalidate the radtan model.
+# Camera calib: official MARS-LVIG "AMvalley" group.
+
+# ---- initial std: attitude, velocity, position | bias | extrinsics | intrinsics
+extended_pose_std: [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-2, 1.0e-2, 1.0e-2]
+bias_std:          [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1]
+extrinsics_std:    [1.0e-2, 1.0e-2, 1.0e-2, 1.0e-2, 1.0e-2, 1.0e-2]
+intrinsics_std:    [1.0, 1.0, 1.0, 1.0]
+
+# ---- IMU noise (Livox Avia built-in BMI088, /imu/data)
+accelerometer_noise_density: 3.300e-03
+accelerometer_random_walk:   1.000e-03
+gyroscope_noise_density:     2.400e-04
+gyroscope_random_walk:       2.000e-05
+
+# ---- camera (Kalibr convention)
+distortion_model: radtan
+distortion_coeffs: [-0.052, 0.1168, 0.0015, 0.00013, -0.068564]   # k1,k2,p1,p2,k3; invariant under the crop + uniform scale, so the official values carry over
+resolution: [640, 480]
+intrinsics: [380.09934641, 379.83006536, 308.78888889, 245.33529412]   # fx, fy, cx, cy
+
+# cam <- IMU (MSCEqF also accepts T_imu_cam and inverts it). Composed from the official
+# cam<-LiDAR extrinsic and the Livox IMU offset; derived, not a Kalibr measurement.
+T_cam_imu:
+  - [ 0.002980846, -0.999727682, -0.023144696,  0.019915904]
+  - [-0.005046067,  0.023129466, -0.999719743,  0.028028537]
+  - [ 0.999982826,  0.003096800, -0.004975748, -0.093077528]
+  - [ 0.000000000,  0.000000000,  0.000000000,  1.000000000]
+
+# Applied as cam.timestamp_ += timeshift_cam_imu, i.e. the value is tau = t_imu - t_cam.
+timeshift_cam_imu: -0.066
+
+# ---- initialiser
+static_initializer_imu_window: 1.0
+static_initializer_acc_threshold: 0.25
+# these keys are checker_*, not the static_initializer_disparity_* of the MSCEqF README
+checker_disparity_window: 0.5
+checker_disparity_threshold: 1.0
+
+# ---- propagator
+state_transition_order: 0        # 0 = first-order, -1 = numerical exp
+imu_buffer_max_size: 1000
+
+# ---- updater
+refine_traingulation: true       # sic (MSCEqF key name)
+feature_min_depth: 0.5
+feature_max_depth: 300.0        # template default of 20 would reject every feature at 80 m AGL
+feature_refinement_max_iterations: 20
+feature_refinement_tollerance: 1e-10
+measurement_projection_method: unit_plane
+feature_representation: anchored_inverse_depth
+pixel_standerd_deviation: 4.0    # sic (MSCEqF key name)
+curvature_correction: true
+min_track_length: 5
+min_angle_deg: 2.0
+zero_velocity_update: enabled
+
+# ---- state
+enable_camera_intrinsic_calibration: false
+gravity: 9.81                    # m/s^2 -- /imu/data must be converted from g first
+num_clones: 11
+num_persistent_features: 0
+
+# ---- tracker
+equalization_method: histogram
+feature_detector: fast
+fast_threshold: 20
+shi_tomasi_quality_level: 0.75   # only read when feature_detector is shi-tomasi
+optical_flow_pyramid_levels: 3
+optical_flow_win_size: 21
+detector_pyramid_levels: 1
+grid_x_size: 4
+grid_y_size: 4
+min_feature_pixel_distance: 15
+min_features: 120
+max_features: 160
+ransac_reprojection: 0.5
+opencv_threads: 0                # 0 = every core
+
+max_track_length: 400
+logger_level: 1

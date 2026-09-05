@@ -1,0 +1,216 @@
+// Copyright (C) 2023 Alessandro Fornasier.
+// Control of Networked Systems, University of Klagenfurt, Austria.
+//
+// All rights reserved.
+//
+// This software is licensed under the terms of the Apache License, Version 2.0
+// (the "License"); you may not use this file except in compliance with the
+// License. You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations
+// under the License.
+//
+// You can contact the authors at <alessandro.fornasier@ieee.org>
+// This file has been modified from the original MSCEqF source.
+
+#include "vision/camera.hpp"
+
+#include <opencv2/core/eigen.hpp>
+
+namespace msceqf
+{
+PinholeCamera::PinholeCamera(const VectorX& distortion_coefficients,
+                             const Vector4 instrinsics,
+                             const uint& width,
+                             const uint& height)
+    : distortion_coefficients_(distortion_coefficients), intrinsics_(instrinsics), width_(width), height_(height)
+{
+}
+
+void PinholeCamera::setIntrinsics(const Vector4& intrinsics) { intrinsics_ = intrinsics; }
+
+const Vector4& PinholeCamera::intrinsics() const { return intrinsics_; }
+
+const VectorX& PinholeCamera::distortionCoefficients() const { return distortion_coefficients_; }
+
+void PinholeCamera::normalize(std::vector<Eigen::Vector2f>& uv)
+{
+  for (auto& coords : uv)
+  {
+    coords(0) = (coords(0) - intrinsics_(2)) / intrinsics_(0);
+    coords(1) = (coords(1) - intrinsics_(3)) / intrinsics_(1);
+  }
+}
+
+void PinholeCamera::normalize(std::vector<cv::Point2f>& uv)
+{
+  for (auto& coords : uv)
+  {
+    coords.x = (coords.x - intrinsics_(2)) / intrinsics_(0);
+    coords.y = (coords.y - intrinsics_(3)) / intrinsics_(1);
+  }
+}
+
+void PinholeCamera::normalize(Eigen::Vector2f& uv)
+{
+  uv(0) = (uv(0) - intrinsics_(2)) / intrinsics_(0);
+  uv(1) = (uv(1) - intrinsics_(3)) / intrinsics_(1);
+}
+
+void PinholeCamera::normalize(cv::Point2f& uv)
+{
+  uv.x = (uv.x - intrinsics_(2)) / intrinsics_(0);
+  uv.y = (uv.y - intrinsics_(3)) / intrinsics_(1);
+}
+
+void PinholeCamera::denormalize(std::vector<Eigen::Vector2f>& uv)
+{
+  for (auto& coords : uv)
+  {
+    coords(0) = coords(0) * intrinsics_(0) + intrinsics_(2);
+    coords(1) = coords(1) * intrinsics_(1) + intrinsics_(3);
+  }
+}
+
+void PinholeCamera::denormalize(std::vector<cv::Point2f>& uv)
+{
+  for (auto& coords : uv)
+  {
+    coords.x = coords.x * intrinsics_(0) + intrinsics_(2);
+    coords.y = coords.y * intrinsics_(1) + intrinsics_(3);
+  }
+}
+
+void PinholeCamera::denormalize(Eigen::Vector2f& uv)
+{
+  uv(0) = uv(0) * intrinsics_(0) + intrinsics_(2);
+  uv(1) = uv(1) * intrinsics_(1) + intrinsics_(3);
+}
+
+void PinholeCamera::denormalize(cv::Point2f& uv)
+{
+  uv.x = uv.x * intrinsics_(0) + intrinsics_(2);
+  uv.y = uv.y * intrinsics_(1) + intrinsics_(3);
+}
+
+void PinholeCamera::undistort(std::vector<Eigen::Vector2f>& uv, const bool& normalize)
+{
+  std::vector<cv::Point2f> uv_cv;
+  uv_cv.reserve(uv.size());
+
+  for (const auto& coords : uv)
+  {
+    uv_cv.emplace_back(coords(0), coords(1));
+  }
+
+  undistort(uv_cv, normalize);
+
+  for (size_t i = 0; i < uv_cv.size(); ++i)
+  {
+    uv[i](0) = uv_cv[i].x;
+    uv[i](1) = uv_cv[i].y;
+  }
+}
+
+RadtanCamera::RadtanCamera(const CameraOptions& opts, const Vector4& intrinsics)
+    : PinholeCamera(opts.distortion_coefficients_, intrinsics, opts.resolution_(0), opts.resolution_(1))
+{
+}
+
+void RadtanCamera::undistort(std::vector<cv::Point2f>& uv_cv, const bool& normalize)
+{
+  // cv::Mat so that OpenCV accepts 4, 5 or 8 distortion coefficients (a fixed
+  // cv::Vec<fp,4> rejects the 5-coefficient radtan [k1,k2,p1,p2,k3]).
+  cv::Mat dist_cv;
+  cv::Matx<fp, 3, 3> K_cv;
+
+  cv::eigen2cv(distortion_coefficients_, dist_cv);
+
+  K_cv(0, 0) = intrinsics_(0);
+  K_cv(1, 1) = intrinsics_(1);
+  K_cv(0, 2) = intrinsics_(2);
+  K_cv(1, 2) = intrinsics_(3);
+  K_cv(2, 2) = 1.0f;
+
+  if (normalize)
+  {
+    cv::undistortPoints(uv_cv, uv_cv, K_cv, dist_cv);
+  }
+  else
+  {
+    cv::undistortPoints(uv_cv, uv_cv, K_cv, dist_cv, cv::noArray(), K_cv);
+  }
+}
+
+void RadtanCamera::undistortImage(const cv::Mat& image, cv::Mat& image_undistorted)
+{
+  // cv::Mat so that OpenCV accepts 4, 5 or 8 distortion coefficients (a fixed
+  // cv::Vec<fp,4> rejects the 5-coefficient radtan [k1,k2,p1,p2,k3]).
+  cv::Mat dist_cv;
+  cv::Matx<fp, 3, 3> K_cv;
+
+  cv::eigen2cv(distortion_coefficients_, dist_cv);
+
+  K_cv(0, 0) = intrinsics_(0);
+  K_cv(1, 1) = intrinsics_(1);
+  K_cv(0, 2) = intrinsics_(2);
+  K_cv(1, 2) = intrinsics_(3);
+  K_cv(2, 2) = 1.0f;
+
+  cv::undistort(image, image_undistorted, K_cv, dist_cv);
+}
+
+EquidistantCamera::EquidistantCamera(const CameraOptions& opts, const Vector4& intrinsics)
+    : PinholeCamera(opts.distortion_coefficients_, intrinsics, opts.resolution_(0), opts.resolution_(1))
+{
+}
+
+void EquidistantCamera::undistort(std::vector<cv::Point2f>& uv_cv, const bool& normalize)
+{
+  cv::Vec<fp, 4> dist_cv;
+  cv::Matx<fp, 3, 3> K_cv;
+
+  cv::eigen2cv(distortion_coefficients_, dist_cv);
+
+  K_cv(0, 0) = intrinsics_(0);
+  K_cv(1, 1) = intrinsics_(1);
+  K_cv(0, 2) = intrinsics_(2);
+  K_cv(1, 2) = intrinsics_(3);
+  K_cv(2, 2) = 1.0f;
+
+  if (normalize)
+  {
+    cv::fisheye::undistortPoints(uv_cv, uv_cv, K_cv, dist_cv);
+  }
+  else
+  {
+    cv::fisheye::undistortPoints(uv_cv, uv_cv, K_cv, dist_cv, cv::noArray(), K_cv);
+  }
+}
+
+void EquidistantCamera::undistortImage(const cv::Mat& image, cv::Mat& image_undistorted)
+{
+  cv::Vec<fp, 4> dist_cv;
+  cv::Matx<fp, 3, 3> K_cv;
+
+  cv::eigen2cv(distortion_coefficients_, dist_cv);
+
+  K_cv(0, 0) = intrinsics_(0);
+  K_cv(1, 1) = intrinsics_(1);
+  K_cv(0, 2) = intrinsics_(2);
+  K_cv(1, 2) = intrinsics_(3);
+  K_cv(2, 2) = 1.0f;
+
+  // cv::fisheye::undistortImage(image, image_undistorted, K_cv, dist_cv);
+  cv::Mat map1, map2;
+  cv::fisheye::initUndistortRectifyMap(K_cv, dist_cv, cv::Matx33d::eye(), K_cv, cv::Size(image.cols, image.rows),
+                                       CV_32FC1, map1, map2);
+  cv::remap(image, image_undistorted, map1, map2, cv::INTER_LINEAR);
+}
+
+}  // namespace msceqf
