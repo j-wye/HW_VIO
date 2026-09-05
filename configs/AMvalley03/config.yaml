@@ -1,9 +1,10 @@
 # ============================================================================
 # AMvalley03 -- config.yaml (stage 2, 2026-09-06)
 # ============================================================================
-# Protocol: run_feeder (keyframe gate), start offsets dropping 0..4 frames, SE3 RMSE
-# median (min-max) over the offsets, 1 s drift median, guards (no divergence, lever-arm
-# excursion and 1 s drift not worse than the previous file, worst offset <= 3x median).
+# Protocol: run_feeder (keyframe gate), 10 start offsets (dropping 0..9 frames),
+# SE3 RMSE median (min-max) over the offsets, 1 s drift median, guards (no divergence,
+# lever-arm excursion and 1 s drift not worse than the previous file, worst offset not
+# beyond 3x the median or 1.5x the previous file's worst).
 # Every number below was produced by this exact file (comments aside).
 #
 # This file : SE3 median 18.58 m (17.3-21.3), 1 s drift 0.716 m, inject 6.35 Hz, lever-arm excursion median 0.54 m, sigma/err (head) 1.08

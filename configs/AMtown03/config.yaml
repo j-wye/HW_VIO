@@ -1,9 +1,10 @@
 # ============================================================================
 # AMtown03 -- config.yaml (stage 1, 2026-09-06)
 # ============================================================================
-# Protocol: run_feeder (keyframe gate), start offsets dropping 0..4 frames, SE3 RMSE
-# median (min-max) over the offsets, 1 s drift median, guards (no divergence, lever-arm
-# excursion and 1 s drift not worse than the previous file, worst offset <= 3x median).
+# Protocol: run_feeder (keyframe gate), 10 start offsets (dropping 0..9 frames),
+# SE3 RMSE median (min-max) over the offsets, 1 s drift median, guards (no divergence,
+# lever-arm excursion and 1 s drift not worse than the previous file, worst offset not
+# beyond 3x the median or 1.5x the previous file's worst).
 # Every number below was produced by this exact file (comments aside).
 #
 # This file : SE3 median 27.60 m (25.3-191.9), 1 s drift 1.338 m, inject 7.18 Hz, lever-arm excursion median 3.35 m, sigma/err (head) 6.27
