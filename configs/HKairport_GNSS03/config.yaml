@@ -11,12 +11,12 @@
 # ---- initial std: attitude, velocity, position | bias | extrinsics | intrinsics
 extended_pose_std: [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-2, 1.0e-2, 1.0e-2]
 bias_std:          [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1]
-extrinsics_std:    [1.0e-2, 1.0e-2, 1.0e-2, 1.0e-2, 1.0e-2, 1.0e-2]
+extrinsics_std: [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1]   # physical prior width of the derived extrinsic
 intrinsics_std:    [1.0, 1.0, 1.0, 1.0]
 
 # ---- IMU noise (Livox Avia built-in BMI088, /imu/data)
 accelerometer_noise_density: 3.300e-03
-accelerometer_random_walk:   1.000e-03
+accelerometer_random_walk:   2.000e-03
 gyroscope_noise_density:     2.400e-04
 gyroscope_random_walk:       2.000e-05
 
@@ -58,7 +58,7 @@ measurement_projection_method: unit_plane
 feature_representation: anchored_inverse_depth
 pixel_standerd_deviation: 4.0    # sic (MSCEqF key name)
 curvature_correction: true
-min_track_length: 5
+min_track_length: 4
 min_angle_deg: 2.0
 zero_velocity_update: enabled
 
@@ -80,9 +80,9 @@ grid_x_size: 4
 grid_y_size: 4
 min_feature_pixel_distance: 15
 min_features: 120
-max_features: 160
+max_features: 120
 ransac_reprojection: 0.5
-opencv_threads: 0                # 0 = every core
+opencv_threads: 1                # 1 = bit-reproducible; use 0 on the vehicle
 
 max_track_length: 400
 logger_level: 1

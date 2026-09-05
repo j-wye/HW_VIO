@@ -2,8 +2,8 @@
 #
 #   ros2 launch vio_node vio_node.launch.py config_filepath:=/abs/path/config.yaml
 #
-# config_filepath, imu_topic and cam_topic are required; the rest have defaults
-# (see src/vio_node.cpp).
+# config_filepath is required. imu_topic / cam_topic default to the dataset names here
+# (the node itself requires them). Everything else has defaults (see src/vio_node.cpp).
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
@@ -21,7 +21,13 @@ def generate_launch_description():
         DeclareLaunchArgument("path_topic", default_value="/vio/path"),
         DeclareLaunchArgument("divergence_topic", default_value="/vio/divergence"),
         DeclareLaunchArgument("reliable_qos", default_value="true"),
+        DeclareLaunchArgument("reorder_lag_s", default_value="0.05"),
         DeclareLaunchArgument("output_rate_hz", default_value="10.0"),
+        DeclareLaunchArgument("frame_id", default_value="global"),
+        DeclareLaunchArgument("body_frame_id", default_value="imu"),
+        DeclareLaunchArgument("divergence_timeout_s", default_value="2.0"),
+        DeclareLaunchArgument("divergence_pos_std_m", default_value="100.0"),
+        DeclareLaunchArgument("path_max_poses", default_value="5000"),
         DeclareLaunchArgument("out_csv", default_value=""),
         DeclareLaunchArgument("use_sim_time", default_value="false"),
     ]
@@ -41,7 +47,13 @@ def generate_launch_description():
                 "path_topic": LaunchConfiguration("path_topic"),
                 "divergence_topic": LaunchConfiguration("divergence_topic"),
                 "reliable_qos": LaunchConfiguration("reliable_qos"),
+                "reorder_lag_s": LaunchConfiguration("reorder_lag_s"),
                 "output_rate_hz": LaunchConfiguration("output_rate_hz"),
+                "frame_id": LaunchConfiguration("frame_id"),
+                "body_frame_id": LaunchConfiguration("body_frame_id"),
+                "divergence_timeout_s": LaunchConfiguration("divergence_timeout_s"),
+                "divergence_pos_std_m": LaunchConfiguration("divergence_pos_std_m"),
+                "path_max_poses": LaunchConfiguration("path_max_poses"),
                 "out_csv": LaunchConfiguration("out_csv"),
                 "use_sim_time": LaunchConfiguration("use_sim_time"),
             }

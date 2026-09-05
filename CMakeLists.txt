@@ -89,6 +89,10 @@ target_include_directories(vio_engine PUBLIC
 target_link_libraries(vio_engine LiePlusPlus Eigen3::Eigen yaml-cpp::yaml-cpp ${Boost_LIBRARIES} ${OpenCV_LIBRARIES})
 target_compile_options(vio_engine PRIVATE ${ENGINE_FLAGS})
 target_link_options(vio_engine PRIVATE ${ENGINE_FLAGS})
+if("-march=native" IN_LIST ENGINE_FLAGS)
+  # 엔진을 링크하는 타깃은 build type과 무관하게 같은 -march를 쓴다 (Eigen 정렬 → 헤더 멤버 오프셋)
+  target_compile_options(vio_engine PUBLIC -march=native)
+endif()
 
 ## front-end + 파이프라인 (노드와 러너가 공유) ------------------------------------------------------
 add_library(vio_pipeline STATIC src/gated_frontend.cpp src/pipeline.cpp)

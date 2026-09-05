@@ -50,8 +50,8 @@ ros2 launch vio_node vio_node.launch.py config_filepath:=/path/to/config.yaml im
 | 파라미터 | 기본값 | 설명 |
 |---|---|---|
 | `config_filepath` | (필수) | 설정 yaml (아래 "설정 파일") |
-| `imu_topic` | (필수) | `sensor_msgs/Imu`, m/s², rad/s |
-| `cam_topic` | (필수) | `sensor_msgs/Image` (bgr8 / rgb8 / mono8) |
+| `imu_topic` | (필수; launch 기본값 `/imu/data`) | `sensor_msgs/Imu`, m/s², rad/s |
+| `cam_topic` | (필수; launch 기본값 `/camera/image_raw`) | `sensor_msgs/Image` (bgr8 / rgb8 / mono8) |
 | `reliable_qos` | `true` | bag 재생용. 실기체 best-effort 드라이버면 `false` |
 | `reorder_lag_s` | `0.05` | IMU 처리를 이만큼(스탬프 기준) 늦춰, 늦게 도착한 이미지가 시간순 자리를 잃지 않게 한다. 종료 로그의 `late_images`가 0이 아니면 키운다. bag을 `--rate r`로 빠르게 재생할 때는 r배 |
 
@@ -61,10 +61,10 @@ ros2 launch vio_node vio_node.launch.py config_filepath:=/path/to/config.yaml im
 |---|---|---|---|
 | `odom_topic` | `/vio/odom` | `nav_msgs/Odometry` | `output_rate_hz`(기본 10 Hz) 고정. 마지막 갱신에서 IMU로 전파한 자세·위치·속도 |
 | `pose_topic` | `/vio/pose` | `geometry_msgs/PoseWithCovarianceStamped` | 필터 갱신마다 (게이트가 발화할 때, 기준 데이터에서 약 7 Hz) |
-| `path_topic` | `/vio/path` | `nav_msgs/Path` | 갱신마다 (최근 `path_max_poses`개) |
+| `path_topic` | `/vio/path` | `nav_msgs/Path` | 갱신마다 (최근 `path_max_poses`개, 기본 5000) |
 | `divergence_topic` | `/vio/divergence` | `std_msgs/Bool` | odom과 같은 주기 |
 
-- `frame_id`(기본 `global`): 필터 원점 기준 좌표계. z 위, 중력 −z. `body_frame_id`(기본 `imu`).
+- `frame_id`(기본 `global`): 필터 원점 기준 좌표계. z 위, 중력 −z. `body_frame_id`(기본 `imu`). 모든 파라미터는 launch 인자로도 줄 수 있다.
 - Odometry의 `twist`는 body 좌표계(ROS 관례). 공분산은 마지막 갱신 시점의 값.
 - `divergence`는 `divergence_timeout_s`(2 s) 동안 갱신이 없거나, 위치 표준편차가 `divergence_pos_std_m`(100 m)을 넘거나, 상태가 유한하지 않으면 true.
 - `out_csv`를 주면 갱신마다 한 행씩 `run_feeder`와 같은 형식의 CSV를 쓴다 (검증용).
