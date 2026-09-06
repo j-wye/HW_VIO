@@ -1,10 +1,15 @@
 // vio_node: ROS2 node around VioPipeline (MSCEqF filter + keyframe-gated front-end).
 //
-// Subscriptions only enqueue. One worker thread processes IMU and images strictly in
-// timestamp order (images are handled before any IMU sample stamped after them), so the
-// estimate does not depend on callback timing and a replayed bag gives the same result
-// as run_feeder. The filter updates when the gate fires (~7 Hz on the reference data);
-// a fixed-rate output is produced by integrating the IMU from the last update.
+// Subscriptions only enqueue; one worker thread does all the work.
+//
+// IMU is drained as it arrives and used immediately for the fixed-rate output, but it is
+// only handed to the filter and the gate once an image bounds it: when a frame stamped
+// t_img is releasable (an IMU sample at or after t_img has been seen, which on an ordered
+// topic proves no earlier IMU is still in flight), every buffered sample up to t_img goes
+// in first, then the frame. So the filter always sees measurements in timestamp order
+// regardless of arrival latency, and a replayed bag gives the same estimates as run_feeder.
+// The filter updates when the gate fires (~7 Hz on the reference data); the output rate is
+// independent of that because it comes from integrating the IMU past the last update.
 
 #include <algorithm>
 #include <atomic>
@@ -63,15 +68,24 @@ class VioNode : public rclcpp::Node
     const std::string pose_topic = declare_parameter<std::string>("pose_topic", "/vio/pose");
     const std::string path_topic = declare_parameter<std::string>("path_topic", "/vio/path");
     const std::string div_topic = declare_parameter<std::string>("divergence_topic", "/vio/divergence");
-    frame_id_ = declare_parameter<std::string>("frame_id", "global");
+    // REP-105: a world-fixed frame that drifts is "odom". The estimate is the pose of the IMU
+    // frame, so body_frame_id names the IMU, not base_link -- a consumer that wants base_link
+    // applies the static base_link->imu transform from its own URDF.
+    frame_id_ = declare_parameter<std::string>("frame_id", "odom");
     body_frame_id_ = declare_parameter<std::string>("body_frame_id", "imu");
-    const bool reliable = declare_parameter<bool>("reliable_qos", true);
-    lag_ = declare_parameter<double>("reorder_lag_s", 0.05);
+    const std::string qos_profile = declare_parameter<std::string>("qos_profile", "reliable");
+
     const double out_hz = declare_parameter<double>("output_rate_hz", 10.0);
+    imu_hold_max_ = declare_parameter<double>("imu_hold_max_s", 1.0);
     div_timeout_ = declare_parameter<double>("divergence_timeout_s", 2.0);
     div_pos_std_ = declare_parameter<double>("divergence_pos_std_m", 100.0);
-    path_max_ = declare_parameter<int>("path_max_poses", 5000);
+    path_max_ = declare_parameter<int>("path_max_poses", 2000);
     const std::string out_csv = declare_parameter<std::string>("out_csv", "");
+
+    // launch validates qos_profile through `choices`, but `ros2 run` does not, so check here too.
+    if (qos_profile != "reliable" && qos_profile != "best_effort")
+      throw std::runtime_error("qos_profile must be 'reliable' or 'best_effort', got '" + qos_profile + "'");
+    const bool reliable = (qos_profile == "reliable");
 
     if (config.empty()) throw std::runtime_error("parameter config_filepath is required");
     if (imu_topic.empty()) throw std::runtime_error("parameter imu_topic is required");
@@ -103,7 +117,8 @@ class VioNode : public rclcpp::Node
     path_.header.frame_id = frame_id_;
 
     // reliable for bag playback (best-effort drops fragmented image frames locally);
-    // set reliable_qos:=false for live best-effort sensor drivers.
+    // use best_effort for live sensor drivers that publish best-effort (a reliable
+    // subscription does not match a best-effort publisher at all).
     const rclcpp::QoS cam_qos = reliable ? rclcpp::QoS(rclcpp::KeepLast(100)).reliable() : rclcpp::SensorDataQoS();
     const rclcpp::QoS imu_qos = reliable ? rclcpp::QoS(rclcpp::KeepLast(2000)).reliable() : rclcpp::SensorDataQoS();
     sub_imu_ = create_subscription<sensor_msgs::msg::Imu>(
@@ -123,8 +138,8 @@ class VioNode : public rclcpp::Node
     cv_.notify_all();
     if (worker_.joinable()) worker_.join();
     if (csv_.is_open()) csv_.close();
-    RCLCPP_INFO(get_logger(), "images=%zu imu=%zu updates=%zu odom=%zu late_images=%zu (frames processed after a later IMU sample; raise reorder_lag_s if > 0)",
-                n_img_, n_imu_, n_update_, n_odom_, n_late_img_);
+    RCLCPP_INFO(get_logger(), "images=%zu imu=%zu updates=%zu odom=%zu late_images=%zu imu_flushes=%zu",
+                n_img_, n_imu_, n_update_, n_odom_, n_late_img_, n_imu_flushed_);
   }
 
  private:
@@ -158,22 +173,13 @@ class VioNode : public rclcpp::Node
     cv_.notify_one();
   }
 
-  // Ordering rules (caller holds mu_). IMU and images each arrive in order on their own
-  // topic; the rules reproduce the global timestamp order of the two streams.
-  bool imuReady() const
-  {
-    if (imu_q_.empty()) return false;
-    const double t = imu_q_.front().t;
-    if (!img_q_.empty()) return t < img_q_.front().t;  // a later image has arrived: nothing older can be in flight
-    if (stop_) return true;                              // draining at shutdown
-    return t <= newest_imu_t_ - lag_;                    // else wait a little for an image stamped before it
-  }
+  // An image is releasable once an IMU sample at or after its stamp has been seen: IMU
+  // arrives in order on its own topic, so that proves no earlier IMU is still in flight.
+  // (caller holds mu_)
   bool imageReady() const
   {
     if (img_q_.empty()) return false;
-    const double t = img_q_.front().t;
-    if (newest_imu_t_ < t && !stop_) return false;       // need the IMU up to the frame first
-    return imu_q_.empty() || imu_q_.front().t >= t;      // and every earlier IMU sample processed
+    return stop_ || newest_imu_t_ >= img_q_.front().t;
   }
 
   void work()
@@ -181,21 +187,22 @@ class VioNode : public rclcpp::Node
     for (;;)
     {
       std::unique_lock<std::mutex> lk(mu_);
-      cv_.wait(lk, [this] { return stop_ || imuReady() || imageReady(); });
+      cv_.wait(lk, [this] { return stop_ || !imu_q_.empty() || imageReady(); });
+      // IMU first, always: it drives the fixed-rate output and must never wait on a frame.
+      if (!imu_q_.empty())
+      {
+        ImuMsg m = imu_q_.front();
+        imu_q_.pop_front();
+        lk.unlock();
+        handleImu(m);
+        continue;
+      }
       if (imageReady())
       {
         ImgMsg m = std::move(img_q_.front());
         img_q_.pop_front();
         lk.unlock();
         handleImage(m);
-        continue;
-      }
-      if (imuReady())
-      {
-        ImuMsg m = imu_q_.front();
-        imu_q_.pop_front();
-        lk.unlock();
-        handleImu(m);
         continue;
       }
       if (stop_) return;
@@ -206,7 +213,15 @@ class VioNode : public rclcpp::Node
   {
     ++n_imu_;
     last_imu_t_ = m.t;
-    pipe_->processImu(m.imu);
+    // Held until a frame bounds it (see handleImage). If the camera stalls, hand it over
+    // anyway so the filter keeps propagating and the divergence flag can fire.
+    held_.push_back(m.imu);
+    if (m.t - held_.front().timestamp_ > imu_hold_max_)
+    {
+      ++n_imu_flushed_;
+      for (const auto& u : held_) pipe_->processImu(u);
+      held_.clear();
+    }
     if (!have_prop_) return;
 
     // integrate our copy of the last estimate forward (world z-up, gravity -z)
@@ -236,7 +251,14 @@ class VioNode : public rclcpp::Node
   void handleImage(const ImgMsg& m)
   {
     ++n_img_;
-    if (m.t < last_imu_t_) ++n_late_img_;  // an IMU sample stamped after this frame was already processed
+    // every held sample up to this frame's stamp goes in first, in order
+    while (!held_.empty() && held_.front().timestamp_ <= m.t)
+    {
+      pipe_->processImu(held_.front());
+      last_fed_imu_t_ = held_.front().timestamp_;
+      held_.pop_front();
+    }
+    if (m.t < last_fed_imu_t_) ++n_late_img_;  // only possible after an imu_hold_max_s flush
     if (!pipe_->processImage(m.t, m.gray)) return;
     onUpdate();
   }
@@ -327,8 +349,8 @@ class VioNode : public rclcpp::Node
 
   std::unique_ptr<vio::VioPipeline> pipe_;
   std::string frame_id_, body_frame_id_;
-  double lag_ = 0.05, period_ = 0.1, div_timeout_ = 2.0, div_pos_std_ = 100.0, gravity_ = 9.81;
-  int path_max_ = 5000;
+  double imu_hold_max_ = 1.0, period_ = 0.1, div_timeout_ = 2.0, div_pos_std_ = 100.0, gravity_ = 9.81;
+  int path_max_ = 2000;
 
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr sub_imu_;
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_cam_;
@@ -349,14 +371,16 @@ class VioNode : public rclcpp::Node
 
   // propagation copy of the last estimate
   bool have_prop_ = false;
-  double prop_t_ = -1.0, next_tick_ = -1.0, last_update_t_ = -1.0, pos_std_ = 0.0, last_imu_t_ = -1.0;
+  std::deque<msceqf::Imu> held_;   // IMU seen but not yet handed to the filter/gate
+  double prop_t_ = -1.0, next_tick_ = -1.0, last_update_t_ = -1.0, pos_std_ = 0.0;
+  double last_imu_t_ = -1.0, last_fed_imu_t_ = -1.0;
   Eigen::Matrix3d prop_R_ = Eigen::Matrix3d::Identity();
   Eigen::Vector3d prop_v_ = Eigen::Vector3d::Zero(), prop_p_ = Eigen::Vector3d::Zero();
   Eigen::Vector3d bw_ = Eigen::Vector3d::Zero(), ba_ = Eigen::Vector3d::Zero(), last_w_ = Eigen::Vector3d::Zero();
   Eigen::Matrix<double, 6, 6> cov_pose_ = Eigen::Matrix<double, 6, 6>::Zero();
   Eigen::Matrix3d cov_vel_ = Eigen::Matrix3d::Zero();
 
-  std::size_t n_img_ = 0, n_imu_ = 0, n_update_ = 0, n_odom_ = 0, n_late_img_ = 0;
+  std::size_t n_img_ = 0, n_imu_ = 0, n_update_ = 0, n_odom_ = 0, n_late_img_ = 0, n_imu_flushed_ = 0;
 };
 
 int main(int argc, char** argv)

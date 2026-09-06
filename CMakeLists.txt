@@ -117,7 +117,7 @@ install(TARGETS vio_engine
   RUNTIME DESTINATION bin)
 install(DIRECTORY include/ DESTINATION include FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp")
 install(TARGETS vio_node run_feeder run_offline DESTINATION lib/${PROJECT_NAME})
-install(DIRECTORY launch DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY launch configs DESTINATION share/${PROJECT_NAME})
 
 ament_export_include_directories(include)
 ament_export_libraries(vio_engine)
