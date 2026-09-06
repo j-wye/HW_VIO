@@ -1,23 +1,5 @@
-# ============================================================================
-# HKisland_GNSS03 -- config.yaml (stage 2, 2026-09-06)
-# ============================================================================
-# Protocol: run_feeder (keyframe gate), 10 start offsets (dropping 0..9 frames),
-# SE3 RMSE median (min-max) over the offsets, 1 s drift median, guards (no divergence,
-# lever-arm excursion and 1 s drift not worse than the previous file, worst offset not
-# beyond 3x the median or 1.5x the previous file's worst).
-# Every number below was produced by this exact file (comments aside).
-#
-# This file : SE3 median 15.03 m (11.2-33.3), 1 s drift 0.747 m, inject 6.04 Hz, lever-arm excursion median 0.97 m, sigma/err (head) 45.73
-#              offsets [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9], GT clock offset +0.00 s
-# Previous  : SE3 median 30.65 m (11.7-89.7), 1 s drift 1.612 m  (results/harness/HKisland_GNSS03/base10.json)
-#              change -51.0 %, better on 7/10 paired offsets, guards all pass
-# Changed vs previous:
-#   curvature_correction = false   -- second-order update correction off: -27 % alone here and the one change that never hurts the other sequences
-#   accelerometer_noise_density = 1.0e-2   -- filter trusts the IMU less: this flight has 24-43 % more airframe vibration than HKisland03 on the same route (docs/05), and the fixed-set base is ~30x overconfident here; -3 % alone, -45 % with curvature off
-#   num_clones = 13   -- 13 clones: same route and camera as HKisland03 where 13 is also the strongest axis; on top of the two changes above 16.74 -> 15.03 m and 1 s drift 1.00 -> 0.75 m. Sequence-specific (collapses AMtown03)
-# Re-checked one-at-a-time under the protocol and kept: optical_flow_pyramid_levels 3 (4 alone is 16.27 m, the runner-up; on top of this triple it is worse), min_angle_deg 2.0 (1.5 fails drift and tail), pixel_standerd_deviation 4.0, min_track_length 4, features 120/120, feature_max_depth 300, frontend delta_px 4 / fire_frac 0.1 / max_dt 0.5 / min_inject 4, extrinsics_std 0.1, fast_threshold 20, equalization histogram, ransac 0.5. Hardest of the four sequences; the filter's own covariance is ~45x optimistic here, so its accuracy score will need the largest calibration
-# Full leaderboard: results/harness/HKisland_GNSS03/leaderboard.md
-# ============================================================================
+# DISABLED -- not part of the evaluation set.
+# Held out of the evaluation set by default; promoting it is a project decision. It was flown 2023-10-24, ONE DAY before HKairport_GNSS03 on the same hardware, and that is the flight disqualified for a tau that swings 198 ms mid-flight -- so it got the strictest check of any sequence here: 8 windows over 90-330 s giving -0.0866/-0.0927/-0.0957/-0.0942/-0.0893/-0.0935/-0.0933/-0.0905. Spread 9.1 ms, std 3.0 ms, and the linear trend over the whole span is only -1.6 ms, i.e. SMALLER than the 2.9 ms residual scatter: noise, not the monotone/step drift HKairport shows. All eight gains sit in -0.95..-1.08. Adopted -0.092 (R^2-weighted), which equals HKisland03 exactly -- same camera/IMU pair, independent flights. Carries the full /ublox_driver/* suite, so receiver_lla (10 Hz real GNSS) is in the converted bag; its header stamps are GPS time, measured +18.000 s ahead (-18 s minimises error against RTK: 59.11 -> 4.72 m), so the converter writes it with the ROS1 record time instead (USE_RECORD_TIME). Same route as HKisland03 flown ~11 months apart (path 1726 vs 1719 m, cruise 8.96 vs 8.96 m/s, extent 280x435 m both), so the pair doubles as a repeatability check.
 # MSCEqF filter config -- HKisland_GNSS03
 # Derived from the official calibration.
 #
@@ -33,7 +15,7 @@ extrinsics_std: [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1]   # physical pr
 intrinsics_std:    [1.0, 1.0, 1.0, 1.0]
 
 # ---- IMU noise (Livox Avia built-in BMI088, /imu/data)
-accelerometer_noise_density: 1.0e-2
+accelerometer_noise_density: 3.300e-03
 accelerometer_random_walk:   2.000e-03
 gyroscope_noise_density:     2.400e-04
 gyroscope_random_walk:       2.000e-05
@@ -75,7 +57,7 @@ feature_refinement_tollerance: 1e-10
 measurement_projection_method: unit_plane
 feature_representation: anchored_inverse_depth
 pixel_standerd_deviation: 4.0    # sic (MSCEqF key name)
-curvature_correction: false
+curvature_correction: true
 min_track_length: 4
 min_angle_deg: 2.0
 zero_velocity_update: enabled
@@ -83,7 +65,7 @@ zero_velocity_update: enabled
 # ---- state
 enable_camera_intrinsic_calibration: false
 gravity: 9.81                    # m/s^2 -- /imu/data must be converted from g first
-num_clones: 13
+num_clones: 11
 num_persistent_features: 0
 
 # ---- tracker

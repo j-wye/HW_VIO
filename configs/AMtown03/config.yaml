@@ -1,24 +1,33 @@
 # ============================================================================
-# AMtown03 -- config.yaml (stage 1, 2026-09-06)
+# DEPLOYMENT RECIPE -- AMtown03 calibration + the fixed variable set (2026-09-04)
 # ============================================================================
-# Protocol: run_feeder (keyframe gate), 10 start offsets (dropping 0..9 frames),
-# SE3 RMSE median (min-max) over the offsets, 1 s drift median, guards (no divergence,
-# lever-arm excursion and 1 s drift not worse than the previous file, worst offset not
-# beyond 3x the median or 1.5x the previous file's worst).
-# Every number below was produced by this exact file (comments aside).
+# 고정 변수 (수정하지 않음)
+#   frontend: delta_px 4, fire_frac 0.1, max_dt 0.5, min_inject 4, min_ref 0   (keyframe gate, block at the end)
+#   min_angle_deg 2.0, min_track_length 4, pixel_standerd_deviation 4.0
+#   min_features 120, max_features 120        <- the single key that decides whether the gate wins
+#   num_clones 11                              <- paired with the gate; raising it collapses the window
+#   extrinsics_std 0.1 x6                      <- honest prior for a DERIVED extrinsic (10 cm / 0.1 rad).
+#                                                 NOT a performance knob: 1e-2 vs 1e-1 differ within
+#                                                 start-offset chaos (medians 31.4 vs 30.0 over 8 offsets),
+#                                                 the lever arm drifts to metres from cruise start with
+#                                                 any prior (E covariance grows with the nav state), and
+#                                                 >= 0.3 m starts the slack regime. Never metres.
+#   accelerometer_random_walk 2e-3             <- transfers across 3 sequences
+# 기체별 1회 측정 후 고정
+#   T_cam_imu / intrinsics / distortion (calibration), timeshift_cam_imu (measured constant),
+#   gyro/accel noise densities (datasheet or Allan -- never tuned on APE)
+# 배포 기하별
+#   feature_max_depth (300 m is for 80 m AGL; >= 800-2300 m at 500 m), window-time cap at altitude
 #
-# This file : SE3 median 27.60 m (25.3-191.9), 1 s drift 1.338 m, inject 7.18 Hz, lever-arm excursion median 3.35 m, sigma/err (head) 6.27
-#              offsets [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9], GT clock offset +0.00 s
-# Previous  : SE3 median 30.80 m (25.1-369.9), 1 s drift 1.422 m  (results/harness/AMtown03/base10.json)
-#              change -10.4 %, better on 6/10 paired offsets, guards all pass
-# Changed vs previous:
-#   accelerometer_noise_density = 1.0e-2   -- filter trusts the IMU less; the bag's accel noise floor is airframe vibration (3.7-4.9e-2 measured static), not the BMI088 datasheet 1.9e-3. Never hurt any sequence, -3..-63 % on four of them
-#   min_features = 140   -- 140 features: this sequence (town, dense texture) benefits; 160 collapses (170 m), 100 is worse
-#   max_features = 140   -- paired with min_features (burst refill kept at zero)
-#   feature_max_depth = 150.0   -- 150 m: at 80 m AGL nadir nothing real is farther than ~110 m slant, so the cap rejects mistriangulated far points. Geometry-specific: raise for 45 deg / 500 m
-#   curvature_correction = false   -- second-order update correction off: no median change on this sequence but the worst start offset falls from 370 m to 82 m alone; -12..-55 % on AMvalley03 / HKisland_GNSS03
-# Re-checked one-at-a-time under the protocol and kept: min_angle_deg 2.0 (1.5/2.5/3.0 all worse), num_clones 11 (9: +23 %, 13: collapse), pixel_standerd_deviation 4.0, min_track_length 4 (3: tail 200 m, 5: +5 %), extrinsics_std 0.1, frontend delta_px 4 / fire_frac 0.1 / max_dt 0.5 (every alternative +30..+750 %), fast_threshold 20 (12/15/17/27 are a knife edge), equalization histogram, optical_flow 21 px / 3 levels, ransac 0.5, accelerometer_random_walk 2e-3
-# Full leaderboard: results/harness/AMtown03/leaderboard.md
+# Measured with this exact file, AMtown03, gate ON, 8 start offsets (0..0.5 s):
+#   APE median 29.96 m (range 25.1-60.8), 1 s drift median 1.39 m
+#   versus gate OFF median 45.98 m (44.5-51.5)      -> robust gain ~ -35 %
+# Same recipe (with each sequence's own calibration): AMvalley03 20.05 (OFF 43.9),
+#   HKisland_GNSS03 15.76 (OFF 92.6). Report medians over start offsets, never one run.
+#
+# Run:
+#   ros2 run vio_node run_feeder <bag> <this file> <out.csv>     (gate values: `frontend:` block below)
+# opencv_threads: 1 is kept for bit-reproducible evaluation; use 0 on the vehicle.
 # ============================================================================
 # MSCEqF filter config -- AMtown03
 # Derived from the official calibration.
@@ -35,7 +44,7 @@ extrinsics_std: [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1]
 intrinsics_std:    [1.0, 1.0, 1.0, 1.0]
 
 # ---- IMU noise (Livox Avia built-in BMI088, /imu/data)
-accelerometer_noise_density: 1.0e-2
+accelerometer_noise_density: 3.300e-03
 accelerometer_random_walk: 0.002
 gyroscope_noise_density:     2.400e-04
 gyroscope_random_walk:       2.000e-05
@@ -71,13 +80,13 @@ imu_buffer_max_size: 1000
 # ---- updater
 refine_traingulation: true       # sic (MSCEqF key name)
 feature_min_depth: 0.5
-feature_max_depth: 150.0
+feature_max_depth: 300.0        # template default of 20 would reject every feature at 80 m AGL
 feature_refinement_max_iterations: 20
 feature_refinement_tollerance: 1e-10
 measurement_projection_method: unit_plane
 feature_representation: anchored_inverse_depth
 pixel_standerd_deviation: 4.0    # sic (MSCEqF key name)
-curvature_correction: false
+curvature_correction: true
 min_track_length: 4
 min_angle_deg: 2.0
 zero_velocity_update: enabled
@@ -99,8 +108,8 @@ detector_pyramid_levels: 1
 grid_x_size: 4
 grid_y_size: 4
 min_feature_pixel_distance: 15
-min_features: 140
-max_features: 140
+min_features: 120
+max_features: 120
 ransac_reprojection: 0.5
 opencv_threads: 1
 

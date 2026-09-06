@@ -1,22 +1,5 @@
-# ============================================================================
-# AMvalley03 -- config.yaml (stage 2, 2026-09-06)
-# ============================================================================
-# Protocol: run_feeder (keyframe gate), 10 start offsets (dropping 0..9 frames),
-# SE3 RMSE median (min-max) over the offsets, 1 s drift median, guards (no divergence,
-# lever-arm excursion and 1 s drift not worse than the previous file, worst offset not
-# beyond 3x the median or 1.5x the previous file's worst).
-# Every number below was produced by this exact file (comments aside).
-#
-# This file : SE3 median 18.58 m (17.3-21.3), 1 s drift 0.716 m, inject 6.35 Hz, lever-arm excursion median 0.54 m, sigma/err (head) 1.08
-#              offsets [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9], GT clock offset +0.00 s
-# Previous  : SE3 median 21.01 m (18.5-67.7), 1 s drift 0.804 m  (results/harness/AMvalley03/base10.json)
-#              change -11.6 %, better on 10/10 paired offsets, guards all pass
-# Changed vs previous:
-#   curvature_correction = false   -- second-order update correction off: -11.8 % median, better on 10/10 start offsets, 1 s drift 0.804 -> 0.717 m, worst offset 68 -> 36 m
-#   frontend.min_inject = 8   -- an update needs at least 8 ready features instead of 4: same median as curvature_correction alone (18.58 vs 18.53) but the worst offset tightens to 21 m (36 m without it). Sequence-specific: on AMtown03 it starves one start offset into divergence
-# Re-checked one-at-a-time under the protocol and kept: accelerometer_noise_density 3.3e-3 (1e-2 gives no further gain here: 18.74), min_angle_deg 2.0, num_clones 11 (13: +166 %), pixel_standerd_deviation 4.0 (3: +14 %, 5: tail), min_track_length 4, features 120/120 (140: +9 %, 120/160: collapse 136 m, 100: 92 m), feature_max_depth 300 (150: +9 % -- valley terrain reaches 150 m), frontend delta_px 4 / fire_frac 0.1 / max_dt 0.5, fast_threshold 20, equalization histogram, optical_flow 21 px / 3 levels, ransac 0.5
-# Full leaderboard: results/harness/AMvalley03/leaderboard.md
-# ============================================================================
+# DISABLED -- not part of the evaluation set.
+# Held out of the evaluation set by default; promoting it is a project decision, not a technical blocker. tau IS constant here: measured over 4 windows (60/180/300/420 s) at -0.0671/-0.0663/-0.0628/-0.0659, spread 4.3 ms, against the 198 ms swing that disqualified HKairport_GNSS03. Value adopted = -0.066 (R^2-weighted), which agrees to 1 ms with the -0.067 of AMtown01/03 -- same platform, same field campaign one day earlier -- so the two independent measurements corroborate each other. The two low-R^2 windows are the straight-cruise ones with little roll excitation, not a tau shift. Terrain relief is large (/height vs RTK relative altitude: corr 0.693, residual std 30.5 m, vs 5.7-10.5 m for the AMtown/HKairport bags) -- that is a valley, not a broken sensor, but it makes /height a poor z anchor and a good depth prior here. Cruise 12.0 m/s duplicates AMtown03 (11.9 m/s), so its worth is unseen-terrain generalisation, not a new speed point.
 # MSCEqF filter config -- AMvalley03
 # Derived from the official calibration.
 #
@@ -74,7 +57,7 @@ feature_refinement_tollerance: 1e-10
 measurement_projection_method: unit_plane
 feature_representation: anchored_inverse_depth
 pixel_standerd_deviation: 4.0    # sic (MSCEqF key name)
-curvature_correction: false
+curvature_correction: true
 min_track_length: 4
 min_angle_deg: 2.0
 zero_velocity_update: enabled
@@ -109,6 +92,6 @@ logger_level: 1
 frontend:
   delta_px: 4.0
   fire_frac: 0.1
-  min_inject: 8
+  min_inject: 4
   min_ref: 0
   max_dt: 0.5

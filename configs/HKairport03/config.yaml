@@ -1,23 +1,5 @@
-# ============================================================================
-# HKairport03 -- config.yaml (stage 2, first 250 s only, 2026-09-06)
-# ============================================================================
-# Protocol: run_feeder (keyframe gate), 10 start offsets (dropping 0..9 frames),
-# SE3 RMSE median (min-max) over the offsets, 1 s drift median, guards (no divergence,
-# lever-arm excursion and 1 s drift not worse than the previous file, worst offset not
-# beyond 3x the median or 1.5x the previous file's worst).
-# Every number below was produced by this exact file (comments aside).
-#
-# This file : SE3 median 14.94 m (11.1-38.4), 1 s drift 1.142 m, inject 5.98 Hz, lever-arm excursion median 0.26 m, sigma/err (head) 3.19
-#              offsets [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9], duration 250.0 s, GT clock offset -2.72 s
-# Previous  : SE3 median 24.58 m (10.5-11087.9), 1 s drift 1.399 m  (results/harness/HKairport03/base10.json)
-#              change -39.2 %, better on 9/10 paired offsets, guards all pass
-# Changed vs previous:
-#   equalization_method = none   -- no histogram equalisation: on the runway/apron imagery equalisation amplifies sensor noise into false corners; 'none' alone is -73 % (5/5) and 'clahe' -68 %, every other single change is weaker
-#   curvature_correction = false   -- second-order update correction off: -39 % with equalisation none (8/10), worst offset 12 km -> 43 m
-#   accelerometer_noise_density = 1.0e-2   -- filter trusts the IMU less (vibration floor, not datasheet noise); on top of the other two: 15.02 -> 14.94 m, 9/10 offsets, worst 38 m
-# Re-checked one-at-a-time under the protocol and kept: min_angle_deg 2.0, num_clones 11 (13: -67 % alone but diverges in combination), pixel_standerd_deviation 4.0, min_track_length 4, features 120/120, feature_max_depth 300, frontend delta_px 4 / fire_frac 0.1 / max_dt 0.5 / min_inject 4, extrinsics_std 0.1, fast_threshold 20, optical_flow 21 px / 3 levels, ransac 0.5. NOTE: tau steps by 77 ms at 250-270 s, so this file is only validated on the first 250 s (--duration 250) and scored with gt_time_offset -2.72 s
-# Full leaderboard: results/harness/HKairport03/leaderboard.md
-# ============================================================================
+# DISABLED -- not part of the evaluation set.
+# DISABLED for quantitative work: tau STEPS mid-flight, the same defect that disqualified HKairport_GNSS03. Measured timeshift: t=80/140/200 -> -0.0900/-0.0914/-0.0829, then t=270/280/295 -> -0.0091 flat. Bracketing it finer, t=250 is -0.0865 and t=270 is -0.0091: a 77 ms STEP between 250 and 270 s that then holds, not scatter. The image stamps themselves are perfectly regular (dt 100.08 ms, std 0.13, zero gaps >150 ms, 3657 frames), so nothing was dropped -- what moved is the relation between the stamp and the actual exposure, i.e. the camera driver re-stamped. No single timeshift_cam_imu can be right, and the full-sequence result shows it: 8.78 %% drift, SE3 181.9 m. Segmented, the diagnosis holds: 0-250 s at tau=-0.087 gives 2.30 %% drift and SE3 34.7 m (under 15 m), while 265-400 s is unusable at either tau (27.75 %% at -0.009, 52.84 %% at -0.090) -- so the post-step part is damaged beyond the offset. Use only the first 250 s, and only for qualitative work.
 # MSCEqF filter config -- HKairport03
 # Derived from the official calibration.
 #
@@ -33,7 +15,7 @@ extrinsics_std: [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1]   # physical pr
 intrinsics_std:    [1.0, 1.0, 1.0, 1.0]
 
 # ---- IMU noise (Livox Avia built-in BMI088, /imu/data)
-accelerometer_noise_density: 1.0e-2
+accelerometer_noise_density: 3.300e-03
 accelerometer_random_walk:   2.000e-03
 gyroscope_noise_density:     2.400e-04
 gyroscope_random_walk:       2.000e-05
@@ -75,7 +57,7 @@ feature_refinement_tollerance: 1e-10
 measurement_projection_method: unit_plane
 feature_representation: anchored_inverse_depth
 pixel_standerd_deviation: 4.0    # sic (MSCEqF key name)
-curvature_correction: false
+curvature_correction: true
 min_track_length: 4
 min_angle_deg: 2.0
 zero_velocity_update: enabled
@@ -87,7 +69,7 @@ num_clones: 11
 num_persistent_features: 0
 
 # ---- tracker
-equalization_method: none
+equalization_method: histogram
 feature_detector: fast
 fast_threshold: 20
 shi_tomasi_quality_level: 0.75   # only read when feature_detector is shi-tomasi
