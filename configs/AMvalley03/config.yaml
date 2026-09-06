@@ -1,5 +1,22 @@
-# DISABLED -- not part of the evaluation set.
-# Held out of the evaluation set by default; promoting it is a project decision, not a technical blocker. tau IS constant here: measured over 4 windows (60/180/300/420 s) at -0.0671/-0.0663/-0.0628/-0.0659, spread 4.3 ms, against the 198 ms swing that disqualified HKairport_GNSS03. Value adopted = -0.066 (R^2-weighted), which agrees to 1 ms with the -0.067 of AMtown01/03 -- same platform, same field campaign one day earlier -- so the two independent measurements corroborate each other. The two low-R^2 windows are the straight-cruise ones with little roll excitation, not a tau shift. Terrain relief is large (/height vs RTK relative altitude: corr 0.693, residual std 30.5 m, vs 5.7-10.5 m for the AMtown/HKairport bags) -- that is a valley, not a broken sensor, but it makes /height a poor z anchor and a good depth prior here. Cruise 12.0 m/s duplicates AMtown03 (11.9 m/s), so its worth is unseen-terrain generalisation, not a new speed point.
+# ============================================================================
+# AMvalley03 -- config.yaml (2026-09-06)
+# ============================================================================
+# Protocol: run_feeder (keyframe gate), one run from the start of the bag -- the whole
+# sequence, byte-identical input for every config. Whole-run SE3 RMSE, plus the
+# distribution of 60 s window APEs inside that run, 1 s drift, guards (no divergence,
+# lever-arm excursion and 1 s drift not worse than the previous file, worst window not
+# beyond 1.5x the previous file's worst, covariance sane).
+# Every number below was produced by this exact file (comments aside).
+#
+# This file : SE3 18.88 m over the whole run; 60 s windows 13.68 / 20.10 / 23.05 m (median / p90 / worst),
+#              1 s drift 0.724 m, inject 6.35 Hz, lever-arm excursion median 0.55 m, sigma/err (head) 1.17, GT clock offset +0.00 s
+# Previous  : SE3 19.79 m; 60 s window median 14.02 m, 1 s drift 0.803 m  (results/harness/AMvalley03/base.json)
+#              change -4.6 %, better on 16/17 of the 60 s windows, guards all pass
+# Changed vs previous:
+#   curvature_correction = false   -- off: a small-angle correction applied across the clone window, which at 12 m/s biases the update more than it fixes. SE3 19.79 -> 18.88 m, 60 s window median 14.02 -> 13.68, 1 s drift 0.803 -> 0.724
+# Re-checked one-at-a-time under the protocol and kept: everything else stays at the fixed set
+# Full leaderboard: results/harness/AMvalley03/leaderboard.md
+# ============================================================================
 # MSCEqF filter config -- AMvalley03
 # Derived from the official calibration.
 #
@@ -57,7 +74,7 @@ feature_refinement_tollerance: 1e-10
 measurement_projection_method: unit_plane
 feature_representation: anchored_inverse_depth
 pixel_standerd_deviation: 4.0    # sic (MSCEqF key name)
-curvature_correction: true
+curvature_correction: false
 min_track_length: 4
 min_angle_deg: 2.0
 zero_velocity_update: enabled

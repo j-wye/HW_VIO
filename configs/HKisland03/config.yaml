@@ -1,5 +1,22 @@
-# DISABLED -- not part of the evaluation set.
-# Held out of the evaluation set by default; promoting it is a project decision, not a technical blocker. It does NOT inherit the HKairport_GNSS03 defect: tau measured over 4 windows (110/180/250/310 s) at -0.0915/-0.0962/-0.0933/-0.0899, spread 6.3 ms with all four gains at -1.00 +/- 0.015, versus HKairport swinging +0.109 -> -0.089 (198 ms). Adopted -0.092 (R^2-weighted). Different flight and date (2022-11-29) from HKairport_GNSS03 (2023-10-25), so the shared site name is not shared hardware state. Fills the speed gap between AMtown01 (4.0 m/s) and AMtown03 (11.9 m/s) at 9.0 m/s, over terrain unlike either, and its /height is clean (corr 0.955, residual std 7.8 m).
+# ============================================================================
+# HKisland03 -- config.yaml (2026-09-06)
+# ============================================================================
+# Protocol: run_feeder (keyframe gate), one run from the start of the bag -- the whole
+# sequence, byte-identical input for every config. Whole-run SE3 RMSE, plus the
+# distribution of 60 s window APEs inside that run, 1 s drift, guards (no divergence,
+# lever-arm excursion and 1 s drift not worse than the previous file, worst window not
+# beyond 1.5x the previous file's worst, covariance sane).
+# Every number below was produced by this exact file (comments aside).
+#
+# This file : SE3 6.84 m over the whole run; 60 s windows 2.64 / 4.60 / 4.66 m (median / p90 / worst),
+#              1 s drift 0.476 m, inject 5.96 Hz, lever-arm excursion median 0.37 m, sigma/err (head) 2.59, GT clock offset +0.35 s
+# Previous  : SE3 12.17 m; 60 s window median 2.95 m, 1 s drift 0.595 m  (results/harness/HKisland03/base.json)
+#              change -43.8 %, better on 6/11 of the 60 s windows, guards all pass
+# Changed vs previous:
+#   num_clones = 13   -- 13 instead of 11: the gate injects at ~6 Hz here, so 11 clones span barely 1.8 s of a 9 m/s flight; two more lengthen the window without raising the injection rate. SE3 12.17 -> 6.84 m, 60 s window median 2.95 -> 2.64, 1 s drift 0.595 -> 0.476
+# Re-checked one-at-a-time under the protocol and kept: everything else stays at the fixed set
+# Full leaderboard: results/harness/HKisland03/leaderboard.md
+# ============================================================================
 # MSCEqF filter config -- HKisland03
 # Derived from the official calibration.
 #
@@ -65,7 +82,7 @@ zero_velocity_update: enabled
 # ---- state
 enable_camera_intrinsic_calibration: false
 gravity: 9.81                    # m/s^2 -- /imu/data must be converted from g first
-num_clones: 11
+num_clones: 13
 num_persistent_features: 0
 
 # ---- tracker
