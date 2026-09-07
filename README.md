@@ -82,7 +82,9 @@ ros2 run vio_node vio_node --ros-args \
 | `/vio/divergence` (`divergence_topic`) | `std_msgs/Bool` | odom과 같은 주기 |
 
 `/vio/odom`은 마지막 필터 갱신 위치에서 IMU로 전파한 값이라, 갱신 주기와 무관하게 일정한 주기로 나온다.
-`/vio/path`는 매번 배열 전체를 다시 보낸다 — Jetson에서는 `path_max_poses`를 줄이거나 구독하지 않는 편이 낫다.
+`/vio/path`는 매번 배열 전체를 다시 보낸다. 기본값 20000은 7 Hz 갱신 기준 약 48분치이고 AMtown03(4441개) 전 구간이 들어간다.
+RViz에서 궤적 앞부분이 잘려 보이면 이 값이 모자란 것이다. 대신 길수록 발행 대역이 커지므로
+(20000개면 한 번에 약 1 MB) Jetson에서는 줄이거나 `/vio/path`를 구독하지 않는 편이 낫다.
 
 **좌표계.** `frame_id`(기본 `odom`)는 필터 원점 기준 좌표계다. z가 위, 중력이 −z이고 yaw는 임의다.
 드리프트하는 월드 고정 프레임이므로 REP-105의 `odom`에 해당한다.
@@ -97,7 +99,7 @@ ros2 run vio_node vio_node --ros-args \
 | `output_rate_hz` | 10.0 | odom·divergence 발행 주기 |
 | `divergence_timeout_s` | 2.0 | 이 시간 동안 갱신이 없으면 divergence |
 | `divergence_pos_std_m` | 100.0 | 위치 표준편차가 이를 넘으면 divergence |
-| `path_max_poses` | 2000 | Path에 담는 최근 pose 개수 |
+| `path_max_poses` | 20000 | Path에 담는 최근 pose 개수. `0`이면 무제한 |
 | `image_queue_max` | 30 | 처리 대기 프레임 상한. 넘으면 오래된 것부터 버린다 |
 | `imu_hold_max_s` | 1.0 | 카메라가 이만큼 조용하면 프레임 없이 IMU를 필터에 넘긴다 |
 | `out_csv` | (없음) | 주면 갱신마다 CSV 한 행. `run_feeder` 출력과 같은 형식 (검증용) |

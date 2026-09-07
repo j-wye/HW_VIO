@@ -36,7 +36,7 @@ def generate_launch_description():
         "image_queue_max": ("30", int),
         "divergence_timeout_s": ("2.0", float),
         "divergence_pos_std_m": ("100.0", float),
-        "path_max_poses": ("2000", int),
+        "path_max_poses": ("20000", int),
         "out_csv": ("", None),
         "use_sim_time": ("false", bool),
     }
