@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -29,13 +30,34 @@ double stampToSec(const builtin_interfaces::msg::Time& t)
 }
 
 // Short form: `run_feeder <sequence>` resolves the three paths by convention --
-//   bag    $VIO_DATASETS/<sequence>   ($VIO_DATASETS defaults to ./datasets)
+//   bag    the first of $VIO_DATASETS/<sequence>, ./datasets/<sequence>,
+//          ~/hanwha/src/datasets/<sequence> that exists (the last is the layout the
+//          README sets up, so a fresh install needs no environment variable)
 //   config <package share>/configs/<sequence>/config.yaml
 //   out    <sequence>.csv in the current directory
 bool resolveSequence(const std::string& seq, std::string& bag, std::string& cfg, std::string& out)
 {
-  const char* root = std::getenv("VIO_DATASETS");
-  bag = (root && *root ? std::string(root) : std::string("datasets")) + "/" + seq;
+  std::vector<std::string> roots;
+  if (const char* env = std::getenv("VIO_DATASETS"); env && *env) roots.emplace_back(env);
+  roots.emplace_back("datasets");
+  if (const char* home = std::getenv("HOME"); home && *home)
+    roots.emplace_back(std::string(home) + "/hanwha/src/datasets");
+
+  bag.clear();
+  for (const auto& r : roots)
+  {
+    const std::string candidate = r + "/" + seq;
+    std::error_code ec;
+    if (std::filesystem::is_directory(candidate, ec)) { bag = candidate; break; }
+  }
+  if (bag.empty())
+  {
+    std::cerr << "[feeder] no bag directory for sequence '" << seq << "'. Looked in:\n";
+    for (const auto& r : roots) std::cerr << "  " << r << "/" << seq << "\n";
+    std::cerr << "Set VIO_DATASETS, or pass the three paths explicitly.\n";
+    return false;
+  }
+
   try
   {
     cfg = ament_index_cpp::get_package_share_directory("vio_node") + "/configs/" + seq + "/config.yaml";
@@ -66,7 +88,8 @@ int main(int argc, char** argv)
       "       run_feeder <bag_dir> <config.yaml> <out.csv> [options] (explicit paths)\n"
       "\n"
       "The short form resolves:\n"
-      "  bag     $VIO_DATASETS/<sequence>   ($VIO_DATASETS defaults to ./datasets)\n"
+      "  bag     first existing of $VIO_DATASETS/<sequence>, ./datasets/<sequence>,\n"
+      "          ~/hanwha/src/datasets/<sequence>\n"
       "  config  <package share>/configs/<sequence>/config.yaml\n"
       "  out     <sequence>.csv in the current directory\n"
       "\n"

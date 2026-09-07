@@ -59,12 +59,6 @@ colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
 source install/setup.bash
 ```
 
-**4. 데이터셋 위치 등록** — 러너가 시퀀스 이름만으로 bag을 찾게 한다.
-
-```bash
-echo "export VIO_DATASETS=$HOME/hanwha/src/datasets" >> ~/.bashrc && source ~/.bashrc
-```
-
 끝나면 이런 모양이 된다.
 
 ```
@@ -156,7 +150,7 @@ ros2 run vio_node run_feeder AMtown03
 
 | | 규칙 |
 |---|---|
-| bag | `$VIO_DATASETS/<시퀀스>` (설치 4단계에서 등록). 없으면 현재 디렉터리의 `datasets/<시퀀스>` |
+| bag | `datasets/<시퀀스>` 또는 `~/hanwha/src/datasets/<시퀀스>` 중 먼저 있는 쪽. 다른 곳에 두었으면 `VIO_DATASETS`로 지정 |
 | config | 설치된 패키지의 `configs/<시퀀스>/config.yaml` |
 | 출력 | 현재 디렉터리의 `<시퀀스>.csv` |
 
