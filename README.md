@@ -21,16 +21,13 @@ configs/<시퀀스>/config.yaml               시퀀스별 설정 (엔진 파라
 
 ## 빌드
 
-Ubuntu 22.04 / ROS2 Humble / OpenCV 4 / Boost.
+Ubuntu 22.04 / ROS2 Humble.
 
-빌드 도구부터 깔아야 한다. ROS를 `ros-humble-ros-base`로만 설치했으면 이것들이 빠져 있고,
-`colcon build`가 `No module named 'catkin_pkg'`로 죽는다.
+의존성은 `package.xml`에 선언돼 있고 `rosdep`이 그대로 설치한다.
 
 ```bash
-sudo apt install git python3-colcon-common-extensions python3-catkin-pkg python3-rosdep python3-empy
+sudo apt install git python3-colcon-common-extensions python3-rosdep
 ```
-
-의존성은 `package.xml`에 선언돼 있으므로 `rosdep`이 알아서 깔아 준다. 목록을 따로 관리하지 않는다.
 
 ```bash
 mkdir -p ~/ws/src
@@ -39,14 +36,6 @@ cd ~/ws
 sudo rosdep init && rosdep update          # 이 머신에서 처음 한 번만
 rosdep install --from-paths src --ignore-src -y
 ```
-
-`rosdep`을 쓰지 않겠다면 같은 목록을 직접 깔아도 된다.
-
-```bash
-sudo apt install libboost-all-dev libopencv-dev ros-humble-rclcpp ros-humble-rosbag2-cpp ros-humble-rosbag2-storage ros-humble-rosbag2-storage-default-plugins ros-humble-std-msgs ros-humble-geometry-msgs ros-humble-sensor-msgs ros-humble-nav-msgs ros-humble-ros2launch
-```
-
-빌드한다.
 
 ```bash
 source /opt/ros/humble/setup.bash
@@ -58,9 +47,6 @@ Lie++, yaml-cpp, Eigen은 CMake가 빌드 중에 받아온다 — 첫 빌드에 
 
 `lto-wrapper: warning: using serial compilation of N LTRANS jobs`는 정상 출력이다.
 엔진이 `-march=native`로 빌드되므로 **실행할 머신(Jetson)에서 직접 빌드해야 한다.** 다른 CPU에서 만든 바이너리는 돌지 않는다.
-
-conda나 venv를 켜 둔 채로 빌드하면 그 python이 시스템 `dist-packages`를 못 봐서 `catkin_pkg`를 찾지 못한다.
-`conda deactivate` 후 빌드한다.
 
 ## 실행
 
