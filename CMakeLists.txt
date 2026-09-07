@@ -42,7 +42,7 @@ message(STATUS "Boost ${Boost_VERSION}  OpenCV ${OpenCV_VERSION}  Lie++ ${LIEPP_
 
 ## ROS2 ---------------------------------------------------------------------------------------
 find_package(ament_cmake REQUIRED)
-set(ament_deps rclcpp rosbag2_cpp rosbag2_storage std_msgs geometry_msgs sensor_msgs nav_msgs)
+set(ament_deps rclcpp rosbag2_cpp rosbag2_storage std_msgs geometry_msgs sensor_msgs nav_msgs ament_index_cpp)
 foreach(dep ${ament_deps})
   find_package(${dep} REQUIRED)
 endforeach()
@@ -108,7 +108,7 @@ ament_target_dependencies(vio_node rclcpp std_msgs geometry_msgs sensor_msgs nav
 target_link_libraries(vio_node vio_pipeline)
 
 add_executable(run_feeder src/run_feeder.cpp)
-ament_target_dependencies(run_feeder rclcpp rosbag2_cpp rosbag2_storage sensor_msgs)
+ament_target_dependencies(run_feeder rclcpp rosbag2_cpp rosbag2_storage sensor_msgs ament_index_cpp)
 target_link_libraries(run_feeder vio_pipeline)
 
 install(TARGETS vio_engine

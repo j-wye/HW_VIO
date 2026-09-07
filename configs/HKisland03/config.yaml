@@ -60,7 +60,7 @@ zero_velocity_update: enabled
 # ---- state
 enable_camera_intrinsic_calibration: false
 gravity: 9.81                    # m/s^2 -- /imu/data must be converted from g first
-num_clones: 13
+num_clones: 13                   # 이 시퀀스만 13 (나머지는 11). 근거는 README.md
 num_persistent_features: 0
 
 # ---- tracker

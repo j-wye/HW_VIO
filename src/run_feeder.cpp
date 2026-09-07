@@ -3,12 +3,14 @@
 // bag through the node gives the same estimates as this runner.
 
 #include <cstdint>
+#include <cstdlib>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <string>
 #include <vector>
 
+#include <ament_index_cpp/get_package_share_directory.hpp>
 #include <rclcpp/serialization.hpp>
 #include <rosbag2_cpp/reader.hpp>
 #include <sensor_msgs/msg/image.hpp>
@@ -26,6 +28,27 @@ double stampToSec(const builtin_interfaces::msg::Time& t)
   return static_cast<double>(t.sec) + 1.0e-9 * static_cast<double>(t.nanosec);
 }
 
+// Short form: `run_feeder <sequence>` resolves the three paths by convention --
+//   bag    $VIO_DATASETS/<sequence>   ($VIO_DATASETS defaults to ./datasets)
+//   config <package share>/configs/<sequence>/config.yaml
+//   out    <sequence>.csv in the current directory
+bool resolveSequence(const std::string& seq, std::string& bag, std::string& cfg, std::string& out)
+{
+  const char* root = std::getenv("VIO_DATASETS");
+  bag = (root && *root ? std::string(root) : std::string("datasets")) + "/" + seq;
+  try
+  {
+    cfg = ament_index_cpp::get_package_share_directory("vio_node") + "/configs/" + seq + "/config.yaml";
+  }
+  catch (const std::exception& e)
+  {
+    std::cerr << "[feeder] cannot locate the vio_node share directory: " << e.what() << "\n";
+    return false;
+  }
+  out = seq + ".csv";
+  return true;
+}
+
 double median(std::vector<double> v)
 {
   if (v.empty()) return 0.0;
@@ -36,10 +59,16 @@ double median(std::vector<double> v)
 
 int main(int argc, char** argv)
 {
-  if (argc < 4)
+  if (argc != 2 && argc < 4)
   {
     std::cerr <<
-      "usage: run_feeder <bag_dir> <config.yaml> <out.csv> [options]\n"
+      "usage: run_feeder <sequence> [options]                        (paths by convention)\n"
+      "       run_feeder <bag_dir> <config.yaml> <out.csv> [options] (explicit paths)\n"
+      "\n"
+      "The short form resolves:\n"
+      "  bag     $VIO_DATASETS/<sequence>   ($VIO_DATASETS defaults to ./datasets)\n"
+      "  config  <package share>/configs/<sequence>/config.yaml\n"
+      "  out     <sequence>.csv in the current directory\n"
       "\n"
       "Keyframe-gated front-end: the engine's own tracker runs on every frame, each\n"
       "feature accumulates rotation-compensated parallax against its own reference, a\n"
@@ -57,11 +86,26 @@ int main(int argc, char** argv)
       "                     Not a tuning knob: the IMU buffer overflows without it.\n"
       "  --disp-log PATH    write per-frame gate statistics CSV\n"
       "  --track-log PATH   write (t,id) for every injected feature\n"
-      "  --start S --duration D\n"
-      "The every-frame path (engine front-end) lives in run_offline.\n";
+      "  --start S --duration D\n";
     return 1;
   }
-  const std::string bag_dir = argv[1], config_path = argv[2], out_path = argv[3];
+
+  std::string bag_dir, config_path, out_path;
+  int first_opt;
+  if (argc == 2 || (argc > 2 && std::string(argv[2]).rfind("--", 0) == 0))
+  {
+    if (!resolveSequence(argv[1], bag_dir, config_path, out_path)) return 1;
+    first_opt = 2;
+    std::cerr << "[feeder] sequence " << argv[1] << ": bag " << bag_dir
+              << " | config " << config_path << " -> " << out_path << "\n";
+  }
+  else
+  {
+    bag_dir = argv[1];
+    config_path = argv[2];
+    out_path = argv[3];
+    first_opt = 4;
+  }
 
   vio::GateParams gp;
   std::string err;
@@ -74,7 +118,7 @@ int main(int argc, char** argv)
 
   double start_s = 0.0, duration_s = -1.0;
   std::string disp_log_path, track_log_path;
-  int i = 4;
+  int i = first_opt;
   for (; i + 1 < argc; i += 2)
   {
     const std::string k = argv[i], v = argv[i + 1];

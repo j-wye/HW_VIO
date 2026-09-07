@@ -116,9 +116,25 @@ rosbag2를 시간순으로 직접 읽어 한 스레드에서 돌린다. ROS를 �
 같은 입력이면 항상 같은 CSV가 나온다. **정확도 작업은 이쪽으로 한다.**
 
 노드가 아니라 그냥 실행파일이라(`--ros-args`를 받지 않는다) `ros2 run`으로 띄운다.
+**시퀀스 이름만 주면 나머지 경로는 규칙으로 정해진다.**
 
 ```bash
-ros2 run vio_node run_feeder <bag_dir> configs/AMtown03/config.yaml out.csv
+ros2 run vio_node run_feeder AMtown03
+```
+
+| | 규칙 |
+|---|---|
+| bag | `$VIO_DATASETS/<시퀀스>` — `VIO_DATASETS`가 없으면 현재 디렉터리의 `datasets/<시퀀스>` |
+| config | 설치된 패키지의 `configs/<시퀀스>/config.yaml` |
+| 출력 | 현재 디렉터리의 `<시퀀스>.csv` |
+
+그래서 데이터셋 폴더 이름과 `configs/` 아래 폴더 이름을 **같게 맞춰 두면** 새 시퀀스를 추가해도 명령이 그대로다.
+시작할 때 실제로 어떤 경로를 골랐는지 stderr에 찍는다.
+
+경로를 직접 주려면 세 개를 전부 준다.
+
+```bash
+ros2 run vio_node run_feeder <bag_dir> <config.yaml> <out.csv>
 ```
 
 `vio_node`가 쓰는 front-end와 **같은 코드**(`gated_frontend.cpp`)를 쓴다. 그래서 이 CSV와 노드의 `out_csv`가
@@ -166,7 +182,7 @@ frontend:          # keyframe 게이트. 블록이 없으면 아래 값을 기�
 MARS-LVIG AMtown03 rosbag2가 필요하다.
 
 ```bash
-ros2 run vio_node run_feeder <bag> configs/AMtown03/config.yaml /tmp/on.csv
+ros2 run vio_node run_feeder AMtown03
 ```
 
 종료할 때 stderr에 `injections=4443 poses=4441`이 찍히면 정상이다. 이 숫자는 게이트가 몇 번 발화했고 필터가 몇 번
