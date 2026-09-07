@@ -11,26 +11,21 @@
 namespace vio
 {
 
-// Filter + gated front-end, driven in timestamp order. Both the ROS node and the offline
-// runner use this class, so a bag replayed through the node produces the same estimates
-// as run_feeder does on the same bag.
+// Filter + gated front-end, driven in timestamp order. Shared by the node and the runner.
 class VioPipeline
 {
  public:
   VioPipeline(const std::string& config_path, const GateParams& gate);
 
-  // Reads the optional `frontend:` block of a config.yaml into `p` (fields not listed keep
-  // their current value). Returns true if the block exists. Unknown keys inside the block
-  // are an error (`err` is set) -- a misspelt key must not silently fall back to a default.
+  // Reads the optional `frontend:` block into `p`. Unknown keys inside it are an error:
+  // a misspelt key must not silently fall back to a default.
   static bool loadGateParams(const std::string& config_path, GateParams& p, std::string& err);
 
   void processImu(const msceqf::Imu& imu);
 
-  // Tracks the frame, injects it if the gate fires. Returns true when the filter was updated
-  // and is initialised, i.e. a new estimate is available (see lastEmitTime / csvRow).
+  // True when the gate fired and the filter produced a new estimate.
   bool processImage(double t_cam, const cv::Mat& gray);
 
-  // Grayscale conversion used by every input path (bag reader and ROS subscriber alike).
   static cv::Mat toGray(int height, int width, const std::string& encoding, const unsigned char* data,
                         std::size_t step);
 
@@ -39,11 +34,10 @@ class VioPipeline
   GatedFrontend& frontend() { return fe_; }
   const GatedFrontend& frontend() const { return fe_; }
 
-  // Timestamp of the last update as seen by the filter (injection time + timeshift_cam_imu).
+  // injection time + timeshift_cam_imu
   double lastEmitTime() const { return last_emit_t_; }
 
-  // True when the last processImage() was actually accepted by the filter (its clock advanced),
-  // false when the engine discarded it. Only meaningful right after processImage() returned true.
+  // False when the engine discarded the frame. Only valid right after processImage() == true.
   bool lastAccepted() const { return last_accepted_; }
 
   static void csvHeader(std::ostream& os);
@@ -59,4 +53,4 @@ class VioPipeline
   std::string extrinsic_err_;
 };
 
-}  // namespace vio
+}

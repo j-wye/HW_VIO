@@ -52,7 +52,7 @@ bool GatedFrontend::processImage(double t_cam, const cv::Mat& gray, msceqf::Tria
     cam.image_ = gray;
     if (topts_.cam_options_.mask_type_ == msceqf::MaskType::STATIC)
     {
-      // required: without the mask the tracker detects nothing
+      // without the mask the tracker detects nothing
       cam.mask_ = topts_.cam_options_.static_mask_;
     }
     tracker_.processCamera(cam);
@@ -63,7 +63,7 @@ bool GatedFrontend::processImage(double t_cam, const cv::Mat& gray, msceqf::Tria
     ids.assign(cf.ids_.begin(), cf.ids_.end());
   }
 
-  // ---- parallax per feature against its reference, rotation compensated ----
+  // parallax per feature against its own reference, rotation compensated
   std::vector<double> dfeat(ids.size(), -1.0);
   int n_ref = 0, n_over = 0;
   for (size_t i = 0; i < ids.size(); ++i)
@@ -92,7 +92,6 @@ bool GatedFrontend::processImage(double t_cam, const cv::Mat& gray, msceqf::Tria
     med_disp = ds[ds.size() / 2];
   }
 
-  // ---- gate decision ----
   const bool have_ref = last_inject_t_ > 0;
   const double frac = n_ref ? double(n_over) / n_ref : 0.0;
   const bool include_all = !have_ref || (params_.min_ref > 0 && n_ref < params_.min_ref) ||
@@ -103,7 +102,6 @@ bool GatedFrontend::processImage(double t_cam, const cv::Mat& gray, msceqf::Tria
   for (size_t i = 0; i < ids.size(); ++i)
     take[i] = include_all ? 1 : (dfeat[i] >= params_.delta_px ? 1 : 0);
 
-  // new features get a reference now; features that died are forgotten
   for (size_t i = 0; i < ids.size(); ++i)
     if (snap_.find(ids[i]) == snap_.end()) { snap_[ids[i]] = xn[i]; snap_R_[ids[i]] = R_abs_; }
   {
@@ -128,7 +126,6 @@ bool GatedFrontend::processImage(double t_cam, const cv::Mat& gray, msceqf::Tria
 
   if (!(fire && !ids.empty())) return false;
 
-  // ---- build the injection ----
   tf = msceqf::TriangulatedFeatures();
   tf.timestamp_ = t_cam;
   for (size_t i = 0; i < ids.size(); ++i)
@@ -138,7 +135,7 @@ bool GatedFrontend::processImage(double t_cam, const cv::Mat& gray, msceqf::Tria
     tf.features_.uvs_.push_back(undist_uv[i]);
     tf.features_.normalized_uvs_.push_back(xn[i]);
     tf.features_.ids_.push_back(ids[i]);
-    tf.points_.emplace_back(msceqf::Vector3::Zero());  // unread by the filter; sized to match features_
+    tf.points_.emplace_back(msceqf::Vector3::Zero());  // unread; sized to match features_
     if (track_log_) *track_log_ << std::setprecision(17) << t_cam << ',' << ids[i] << '\n';
   }
 
@@ -150,11 +147,10 @@ bool GatedFrontend::processImage(double t_cam, const cv::Mat& gray, msceqf::Tria
   }
   stats_.nfeat_at_inject.push_back(ids.size());
   last_inject_t_ = t_cam;
-  // keyframe rule: only the injected features get a fresh reference; the rest keep
-  // accumulating parallax against their old one.
+  // keyframe rule: only the injected features get a fresh reference
   for (size_t i = 0; i < ids.size(); ++i)
     if (take[i]) { snap_[ids[i]] = xn[i]; snap_R_[ids[i]] = R_abs_; }
   return true;
 }
 
-}  // namespace vio
+}

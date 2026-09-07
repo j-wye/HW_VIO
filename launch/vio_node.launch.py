@@ -1,8 +1,3 @@
-# vio_node launch.
-#
-#   ros2 launch vio_node vio_node.launch.py
-#   ros2 launch vio_node vio_node.launch.py config_filepath:=/abs/path/config.yaml cam_topic:=/cam0
-#
 # config_filepath defaults to the AMtown03 config shipped with the package.
 
 import os
@@ -20,7 +15,6 @@ def generate_launch_description():
         get_package_share_directory("vio_node"), "configs", "AMtown03", "config.yaml"
     )
 
-    # name -> (default, type). type=None means plain string.
     params = {
         "config_filepath": (default_config, None),
         "imu_topic": ("/imu/data", None),
@@ -42,16 +36,14 @@ def generate_launch_description():
     }
 
     args = [DeclareLaunchArgument(k, default_value=v) for k, (v, _) in params.items()]
-    # the node accepts exactly these two; `choices` is checked by launch only, so the node
-    # validates the value again for the `ros2 run` path.
     args.append(
         DeclareLaunchArgument(
             "qos_profile", default_value="reliable", choices=["reliable", "best_effort"]
         )
     )
 
-    # Numeric parameters must carry their type: a bare LaunchConfiguration passes the text,
-    # and `output_rate_hz:=10` would then reach the node as an int and be rejected.
+    # numeric parameters must carry their type: `output_rate_hz:=10` would otherwise
+    # reach the node as an int and be rejected
     values = {
         k: (LaunchConfiguration(k) if t is None else ParameterValue(LaunchConfiguration(k), value_type=t))
         for k, (_, t) in params.items()

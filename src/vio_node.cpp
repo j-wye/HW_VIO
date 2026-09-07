@@ -1,15 +1,8 @@
-// vio_node: ROS2 node around VioPipeline (MSCEqF filter + keyframe-gated front-end).
+// ROS2 node around VioPipeline. Subscriptions enqueue; one worker thread does the work.
 //
-// Subscriptions only enqueue; one worker thread does all the work.
-//
-// IMU is drained as it arrives and used immediately for the fixed-rate output, but it is
-// only handed to the filter and the gate once an image bounds it: when a frame stamped
-// t_img is releasable (an IMU sample at or after t_img has been seen, which on an ordered
-// topic proves no earlier IMU is still in flight), every buffered sample up to t_img goes
-// in first, then the frame. So the filter always sees measurements in timestamp order
-// regardless of arrival latency, and a replayed bag gives the same estimates as run_feeder.
-// The filter updates when the gate fires (~7 Hz on the reference data); the output rate is
-// independent of that because it comes from integrating the IMU past the last update.
+// IMU drives the fixed-rate output as it arrives, but reaches the filter and the gate only
+// once a frame bounds it, so measurements go in in timestamp order whatever the arrival
+// latency and a replayed bag matches run_feeder.
 
 #include <algorithm>
 #include <atomic>
@@ -54,7 +47,7 @@ builtin_interfaces::msg::Time toStamp(double t)
   s.nanosec = static_cast<uint32_t>(nsec);
   return s;
 }
-}  // namespace
+}
 
 class VioNode : public rclcpp::Node
 {
@@ -68,9 +61,7 @@ class VioNode : public rclcpp::Node
     const std::string pose_topic = declare_parameter<std::string>("pose_topic", "/vio/pose");
     const std::string path_topic = declare_parameter<std::string>("path_topic", "/vio/path");
     const std::string div_topic = declare_parameter<std::string>("divergence_topic", "/vio/divergence");
-    // REP-105: a world-fixed frame that drifts is "odom". The estimate is the pose of the IMU
-    // frame, so body_frame_id names the IMU, not base_link -- a consumer that wants base_link
-    // applies the static base_link->imu transform from its own URDF.
+    // REP-105 "odom". The estimate is the IMU frame's pose, not base_link.
     frame_id_ = declare_parameter<std::string>("frame_id", "odom");
     body_frame_id_ = declare_parameter<std::string>("body_frame_id", "imu");
     const std::string qos_profile = declare_parameter<std::string>("qos_profile", "reliable");
@@ -83,7 +74,6 @@ class VioNode : public rclcpp::Node
     path_max_ = declare_parameter<int>("path_max_poses", 5000);   // 0 = 무제한
     const std::string out_csv = declare_parameter<std::string>("out_csv", "");
 
-    // launch validates qos_profile through `choices`, but `ros2 run` does not, so check here too.
     if (qos_profile != "reliable" && qos_profile != "best_effort")
       throw std::runtime_error("qos_profile must be 'reliable' or 'best_effort', got '" + qos_profile + "'");
     const bool reliable = (qos_profile == "reliable");
@@ -120,9 +110,7 @@ class VioNode : public rclcpp::Node
     pub_div_ = create_publisher<std_msgs::msg::Bool>(div_topic, 10);
     path_.header.frame_id = frame_id_;
 
-    // reliable for bag playback (best-effort drops fragmented image frames locally);
-    // use best_effort for live sensor drivers that publish best-effort (a reliable
-    // subscription does not match a best-effort publisher at all).
+    // a reliable subscription does not match a best-effort publisher at all
     const rclcpp::QoS cam_qos = reliable ? rclcpp::QoS(rclcpp::KeepLast(100)).reliable()
                                          : rclcpp::QoS(rclcpp::KeepLast(100)).best_effort();
     const rclcpp::QoS imu_qos = reliable ? rclcpp::QoS(rclcpp::KeepLast(2000)).reliable()
@@ -132,8 +120,7 @@ class VioNode : public rclcpp::Node
     sub_cam_ = create_subscription<sensor_msgs::msg::Image>(
         cam_topic, cam_qos, [this](sensor_msgs::msg::Image::SharedPtr m) { onImage(*m); });
 
-    // The odometry path only runs on IMU arrival, so a silent IMU would also silence the
-    // divergence flag. This timer reports it independently of the data streams.
+    // the odometry path runs on IMU arrival, so a silent IMU would also silence divergence
     watchdog_ = create_wall_timer(std::chrono::duration<double>(div_timeout_ / 2.0), [this] { watchdog(); });
 
     worker_ = std::thread([this] { work(); });
@@ -176,8 +163,8 @@ class VioNode : public rclcpp::Node
 
   void onImage(const sensor_msgs::msg::Image& m)
   {
-    // The tracker builds its detection grid from the incoming size but masks with the configured
-    // one, so a mismatched frame silently tracks the wrong region instead of failing.
+    // the tracker grids by the incoming size but masks with the configured one, so a
+    // mismatched frame silently tracks the wrong region instead of failing
     if (static_cast<int>(m.width) != cam_w_ || static_cast<int>(m.height) != cam_h_)
     {
       RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 5000, "image is %ux%u, config says %dx%d; dropping",
@@ -200,7 +187,6 @@ class VioNode : public rclcpp::Node
     {
       std::lock_guard<std::mutex> lk(mu_);
       img_q_.push_back(std::move(q));
-      // Bounded so a worker that falls behind sheds frames instead of growing without limit.
       while (img_q_max_ > 0 && static_cast<int>(img_q_.size()) > img_q_max_)
       {
         img_q_.pop_front();
@@ -210,9 +196,7 @@ class VioNode : public rclcpp::Node
     cv_.notify_one();
   }
 
-  // An image is releasable once an IMU sample at or after its stamp has been seen: IMU
-  // arrives in order on its own topic, so that proves no earlier IMU is still in flight.
-  // (caller holds mu_)
+  // releasable once an IMU sample at or after its stamp has been seen (caller holds mu_)
   bool imageReady() const
   {
     if (img_q_.empty()) return false;
@@ -225,7 +209,7 @@ class VioNode : public rclcpp::Node
     {
       std::unique_lock<std::mutex> lk(mu_);
       cv_.wait(lk, [this] { return stop_ || !imu_q_.empty() || imageReady(); });
-      // IMU first, always: it drives the fixed-rate output and must never wait on a frame.
+      // IMU first: it drives the output and must never wait on a frame
       try
       {
         if (!imu_q_.empty())
@@ -247,7 +231,6 @@ class VioNode : public rclcpp::Node
       }
       catch (const std::exception& e)
       {
-        // without this the worker would die and the node would sit there publishing nothing
         RCLCPP_FATAL(get_logger(), "processing thread failed: %s", e.what());
         rclcpp::shutdown();
         return;
@@ -260,8 +243,8 @@ class VioNode : public rclcpp::Node
   {
     ++n_imu_;
     last_imu_t_ = m.t;
-    // Held until a frame bounds it (see handleImage). The trigger is camera silence, not the
-    // span of held_: with frames already queued, flushing would feed IMU past them.
+    // trigger is camera silence, not the span of held_: with frames queued, flushing
+    // would feed IMU past them
     held_.push_back(m.imu);
     replay_.push_back(m.imu);
     bool camera_silent;
@@ -276,7 +259,6 @@ class VioNode : public rclcpp::Node
       if (!held_.empty()) last_fed_imu_t_ = held_.back().timestamp_;
       held_.clear();
     }
-    // keep enough history to re-integrate from an update time that lies in the past
     while (replay_.size() > 2 && m.t - replay_.front().timestamp_ > imu_hold_max_ + 1.0) replay_.pop_front();
 
     std::lock_guard<std::mutex> lk(pub_mu_);
@@ -292,9 +274,8 @@ class VioNode : public rclcpp::Node
     }
   }
 
-  // One Euler step of the output copy. Skipping a sample must not advance prop_t_, otherwise the
-  // interval is dropped and a stale pose goes out stamped with the current time.
-  // The caller holds pub_mu_ (this must not take it: onUpdate calls this while holding it).
+  // One Euler step of the output copy. Skipping a sample must not advance prop_t_.
+  // Caller holds pub_mu_ -- must not take it here (onUpdate calls this while holding it).
   void integrateLocked(const msceqf::Imu& u)
   {
     const double dt = u.timestamp_ - prop_t_;
@@ -318,15 +299,12 @@ class VioNode : public rclcpp::Node
   {
     ++n_img_;
     last_img_t_ = m.t;
-    // every held sample up to this frame's stamp goes in first, in order
     while (!held_.empty() && held_.front().timestamp_ <= m.t)
     {
       pipe_->processImu(held_.front());
       last_fed_imu_t_ = held_.front().timestamp_;
       held_.pop_front();
     }
-    // a frame older than IMU already given to the filter: an out-of-order camera topic, or a
-    // frame that arrived after a camera-silence flush
     if (m.t < last_fed_imu_t_) ++n_late_img_;
     if (!pipe_->processImage(m.t, m.gray)) return;
     if (!pipe_->lastAccepted())
@@ -345,7 +323,6 @@ class VioNode : public rclcpp::Node
     const auto est = pipe_->sys().stateEstimate();
     const auto core = pipe_->sys().coreCovariance();
 
-    // reset the propagation copy to the fresh estimate
     prop_t_ = t;
     prop_R_ = est.T().R();
     prop_v_ = est.T().v();
@@ -355,25 +332,21 @@ class VioNode : public rclcpp::Node
     have_prop_ = true;
     last_update_t_ = t;
 
-    // The samples between the update time and the newest IMU were already consumed by the old
-    // copy; replay them so the next arrival integrates one sample step, not |timeshift| worth.
+    // replay what the old copy already consumed, so the next arrival is one sample step
     for (const auto& u : replay_)
       if (u.timestamp_ > t) integrateLocked(u);
 
-    // The core covariance is expressed in the filter's own error coordinates (blocks: attitude
-    // 0-2, velocity 3-5, position 6-8, left error on D relative to the origin frame). ROS wants
-    // Cov(p - p_hat) and fixed-axis Cov(dtheta) in frame_id, and the twist covariance in the
-    // child frame, so rotate both instead of copying the raw blocks.
+    // filter error coordinates (attitude 0-2, velocity 3-5, position 6-8) -> ROS convention
     const Eigen::Matrix3d R0 = pipe_->sys().stateOrigin().T().R();
     const Eigen::Vector3d p_hat = est.T().p();
-    Eigen::Matrix3d px;  // [p_hat]_x
+    Eigen::Matrix3d px;
     px << 0.0, -p_hat.z(), p_hat.y(), p_hat.z(), 0.0, -p_hat.x(), -p_hat.y(), p_hat.x(), 0.0;
     Eigen::Matrix<double, 6, 9> J = Eigen::Matrix<double, 6, 9>::Zero();
-    J.block<3, 3>(0, 0) = -px * R0;   // position   <- attitude error
-    J.block<3, 3>(0, 6) = R0;         // position   <- position error
-    J.block<3, 3>(3, 0) = R0;         // orientation<- attitude error
+    J.block<3, 3>(0, 0) = -px * R0;
+    J.block<3, 3>(0, 6) = R0;
+    J.block<3, 3>(3, 0) = R0;
     cov_pose_ = J * core.block<9, 9>(0, 0) * J.transpose();
-    const Eigen::Matrix3d R_D = R0.transpose() * prop_R_;  // origin -> body
+    const Eigen::Matrix3d R_D = R0.transpose() * prop_R_;
     cov_vel_ = R_D.transpose() * core.block<3, 3>(3, 3) * R_D;
     pos_std_ = std::sqrt(cov_pose_.block<3, 3>(0, 0).trace() / 3.0);
 
@@ -423,7 +396,6 @@ class VioNode : public rclcpp::Node
     pub_div_->publish(div);
   }
 
-  // Runs on the ROS executor thread: reports divergence even when no IMU is arriving.
   void watchdog()
   {
     std_msgs::msg::Bool div;
@@ -435,7 +407,6 @@ class VioNode : public rclcpp::Node
     pub_div_->publish(div);
   }
 
-  // caller holds pub_mu_ (or is the worker before publishing)
   bool diverged(double t) const
   {
     return (t - last_update_t_) > div_timeout_ || pos_std_ > div_pos_std_ || !std::isfinite(prop_p_.x()) ||
@@ -476,7 +447,6 @@ class VioNode : public rclcpp::Node
   bool stop_ = false;
   std::thread worker_;
 
-  // propagation copy of the last estimate
   bool have_prop_ = false;
   rclcpp::TimerBase::SharedPtr watchdog_;
   std::mutex pub_mu_;              // guards the state the watchdog reads

@@ -1,6 +1,5 @@
-// Offline runner with the keyframe-gated front-end. Reads a rosbag2 in timestamp order and
-// drives VioPipeline in one thread -- the same pipeline vio_node runs live, so replaying a
-// bag through the node gives the same estimates as this runner.
+// Offline runner: reads a rosbag2 in timestamp order and drives VioPipeline in one thread.
+// Same pipeline vio_node runs live, so replaying a bag through the node matches this.
 
 #include <cstdint>
 #include <cstdlib>
@@ -29,12 +28,8 @@ double stampToSec(const builtin_interfaces::msg::Time& t)
   return static_cast<double>(t.sec) + 1.0e-9 * static_cast<double>(t.nanosec);
 }
 
-// Short form: `run_feeder <sequence>` resolves the three paths by convention --
-//   bag    the first of $VIO_DATASETS/<sequence>, ./datasets/<sequence>,
-//          ~/hanwha/src/datasets/<sequence> that exists (the last is the layout the
-//          README sets up, so a fresh install needs no environment variable)
-//   config <package share>/configs/<sequence>/config.yaml
-//   out    <sequence>.csv in the current directory
+// `run_feeder <sequence>`: bag = first existing of $VIO_DATASETS, ./datasets,
+// ~/hanwha/src/datasets; config = package share; out = <sequence>.csv here.
 bool resolveSequence(const std::string& seq, std::string& bag, std::string& cfg, std::string& out)
 {
   std::vector<std::string> roots;
@@ -77,7 +72,7 @@ double median(std::vector<double> v)
   std::nth_element(v.begin(), v.begin() + v.size() / 2, v.end());
   return v[v.size() / 2];
 }
-}  // namespace
+}
 
 int main(int argc, char** argv)
 {

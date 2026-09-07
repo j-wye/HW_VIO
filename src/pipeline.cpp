@@ -13,8 +13,8 @@ namespace vio
 
 cv::Matx33d VioPipeline::loadRotationCamImu(const std::string& config_path, std::string& err)
 {
-  // Same precedence as the engine's parser: T_imu_cam wins and is used as given, T_cam_imu is
-  // inverted. The gate needs cam <- imu, so T_imu_cam's rotation block is transposed here.
+  // engine parser precedence: T_imu_cam wins and is used as given, T_cam_imu is inverted.
+  // The gate needs cam <- imu, hence the transpose.
   cv::Matx33d R = cv::Matx33d::eye();
   auto read3x3 = [&R](const YAML::Node& T, bool transpose) {
     if (!T || !T.IsSequence() || T.size() < 3) return false;
@@ -88,9 +88,8 @@ VioPipeline::VioPipeline(const std::string& config_path, const GateParams& gate)
 {
   if (!extrinsic_err_.empty())
     throw std::runtime_error(extrinsic_err_ + " -- the gate cannot compensate rotation without it");
-  // Both drivers of this class feed every IMU sample stamped up to the frame before the frame
-  // itself. The engine shifts the frame stamp by timeshift_cam_imu and propagates to it, so a
-  // positive shift would target a time past every sample it was given.
+  // the engine shifts the frame stamp by timeshift_cam_imu and propagates to it, so a
+  // positive shift would target a time past every sample it was given
   const double ts = sys_.options().track_manager_options_.tracker_options_.cam_options_.timeshift_cam_imu_;
   if (ts > 0.0)
     throw std::runtime_error("timeshift_cam_imu must be <= 0 for this pipeline (got " + std::to_string(ts) + ")");
@@ -108,10 +107,8 @@ bool VioPipeline::processImage(double t_cam, const cv::Mat& gray)
   if (!fe_.processImage(t_cam, gray, tf)) return false;
   const double filter_t_before = sys_.timestamp();
   sys_.processMeasurement(tf);
-  // processMeasurement shifts the stamp by timeshift_cam_imu internally
   last_emit_t_ = tf.timestamp_;
-  // The engine returns without touching the state when it discards a measurement (stamp older
-  // than the state, propagation failure). Its clock only moves on an accepted one.
+  // the engine's clock only moves on an accepted measurement
   last_accepted_ = sys_.isInit() && sys_.timestamp() > filter_t_before;
   return sys_.isInit();
 }
@@ -179,4 +176,4 @@ void VioPipeline::csvRow(std::ostream& os) const
   os << '\n';
 }
 
-}  // namespace vio
+}
