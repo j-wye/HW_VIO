@@ -19,28 +19,60 @@ launch/vio_node.launch.py
 configs/<시퀀스>/config.yaml               시퀀스별 설정 (엔진 파라미터 + 게이트 값)
 ```
 
-## 빌드
+## 설치
 
-Ubuntu 22.04 / ROS2 Humble.
+Ubuntu 22.04 / ROS2 Humble. 디스크는 데이터셋 때문에 **45 GB 이상** 비어 있어야 한다(zip 21 GB + 압축 해제 21 GB).
+
+```bash
+sudo apt install git unzip python3-colcon-common-extensions python3-rosdep
+python3 -m pip install gdown
+```
+
+**1. 워크스페이스와 패키지**
+
+```bash
+mkdir -p ~/hanwha/src
+git clone https://github.com/j-wye/HW_VIO.git ~/hanwha/src/vio_node
+```
+
+**2. 데이터셋** (MARS-LVIG 시퀀스의 rosbag2 변환본, 21.4 GB)
+
+```bash
+cd ~/hanwha/src
+gdown 1WpPCvj6n-_g99b8_OwjQYuYs4JMf-vKi -O datasets.zip
+unzip -q datasets.zip && rm datasets.zip
+touch datasets/COLCON_IGNORE
+```
+
+`COLCON_IGNORE`는 colcon이 21 GB짜리 데이터셋 트리를 매번 훑지 않게 한다.
+
+**3. 의존성과 빌드**
 
 의존성은 `package.xml`에 선언돼 있고 `rosdep`이 그대로 설치한다.
 
 ```bash
-sudo apt install git python3-colcon-common-extensions python3-rosdep
-```
-
-```bash
-mkdir -p ~/ws/src
-git clone https://github.com/j-wye/HW_VIO.git ~/ws/src/vio_node
-cd ~/ws
+cd ~/hanwha
 sudo rosdep init && rosdep update          # 이 머신에서 처음 한 번만
 rosdep install --from-paths src --ignore-src -y
-```
-
-```bash
 source /opt/ros/humble/setup.bash
 colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
 source install/setup.bash
+```
+
+**4. 데이터셋 위치 등록** — 러너가 시퀀스 이름만으로 bag을 찾게 한다.
+
+```bash
+echo "export VIO_DATASETS=$HOME/hanwha/src/datasets" >> ~/.bashrc && source ~/.bashrc
+```
+
+끝나면 이런 모양이 된다.
+
+```
+~/hanwha/
+  build/ install/ log/        colcon 산출물
+  src/
+    vio_node/                 이 저장소
+    datasets/<시퀀스>/         rosbag2
 ```
 
 Lie++, yaml-cpp, Eigen은 CMake가 빌드 중에 받아온다 — 첫 빌드에 네트워크가 필요하다. 커밋을 고정해 두었다.
@@ -124,7 +156,7 @@ ros2 run vio_node run_feeder AMtown03
 
 | | 규칙 |
 |---|---|
-| bag | `$VIO_DATASETS/<시퀀스>` — `VIO_DATASETS`가 없으면 현재 디렉터리의 `datasets/<시퀀스>` |
+| bag | `$VIO_DATASETS/<시퀀스>` (설치 4단계에서 등록). 없으면 현재 디렉터리의 `datasets/<시퀀스>` |
 | config | 설치된 패키지의 `configs/<시퀀스>/config.yaml` |
 | 출력 | 현재 디렉터리의 `<시퀀스>.csv` |
 
