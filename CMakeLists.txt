@@ -38,7 +38,7 @@ message(STATUS "Eigen VER: ${EIGEN3_VERSION}  Lie++ VER: ${LiePlusPlus_VERSION} 
 
 ## ROS2 ---------------------------------------------------------------------------------------
 find_package(ament_cmake REQUIRED)
-set(ament_deps rclcpp rosbag2_cpp rosbag2_storage std_msgs geometry_msgs sensor_msgs nav_msgs cv_bridge)
+set(ament_deps rclcpp rosbag2_cpp rosbag2_storage std_msgs geometry_msgs sensor_msgs nav_msgs)
 foreach(dep ${ament_deps})
   find_package(${dep} REQUIRED)
 endforeach()
@@ -108,17 +108,16 @@ ament_target_dependencies(run_feeder rclcpp rosbag2_cpp rosbag2_storage sensor_m
 target_link_libraries(run_feeder vio_pipeline)
 
 add_executable(run_offline src/run_offline.cpp)
-ament_target_dependencies(run_offline rclcpp rosbag2_cpp rosbag2_storage sensor_msgs cv_bridge)
-target_link_libraries(run_offline vio_engine ${OpenCV_LIBRARIES})
+ament_target_dependencies(run_offline rclcpp rosbag2_cpp rosbag2_storage sensor_msgs)
+target_link_libraries(run_offline vio_pipeline)
 
 install(TARGETS vio_engine
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
-install(DIRECTORY include/ DESTINATION include FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp")
 install(TARGETS vio_node run_feeder run_offline DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY launch configs DESTINATION share/${PROJECT_NAME})
 
-ament_export_include_directories(include)
-ament_export_libraries(vio_engine)
+# No downstream C++ interface is exported: the engine headers pull in Lie++, which FetchContent
+# builds but never installs, so an exported include path could not be compiled against anyway.
 ament_package()

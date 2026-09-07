@@ -16,6 +16,7 @@
 // under the License.
 //
 // You can contact the authors at <alessandro.fornasier@ieee.org>
+// This file has been modified from the original MSCEqF source.
 
 #ifndef MSCEQF_HPP
 #define MSCEQF_HPP
@@ -135,6 +136,12 @@ class MSCEqF
    * @return true if the filter is initialized, false otherwise
    */
   [[nodiscard]] const bool& isInit() const;
+
+  /**
+   * @brief Timestamp of the actual estimate. It only advances when a measurement is actually
+   * processed, so a caller can tell an accepted update from a discarded one.
+   */
+  [[nodiscard]] const fp& timestamp() const { return timestamp_; }
 
   /**
    * @brief Check if a zero velocity update has been performed

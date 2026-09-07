@@ -42,15 +42,21 @@ class VioPipeline
   // Timestamp of the last update as seen by the filter (injection time + timeshift_cam_imu).
   double lastEmitTime() const { return last_emit_t_; }
 
+  // True when the last processImage() was actually accepted by the filter (its clock advanced),
+  // false when the engine discarded it. Only meaningful right after processImage() returned true.
+  bool lastAccepted() const { return last_accepted_; }
+
   static void csvHeader(std::ostream& os);
   void csvRow(std::ostream& os) const;
 
  private:
-  static cv::Matx33d loadRotationCamImu(const std::string& config_path);
+  static cv::Matx33d loadRotationCamImu(const std::string& config_path, std::string& err);
 
   msceqf::MSCEqF sys_;
   GatedFrontend fe_;
   double last_emit_t_ = -1.0;
+  bool last_accepted_ = false;
+  std::string extrinsic_err_;
 };
 
 }  // namespace vio

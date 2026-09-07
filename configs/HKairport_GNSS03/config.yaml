@@ -26,7 +26,8 @@ distortion_coeffs: [-0.056, 0.118, 0.00122, 0.00064, -0.0627]   # k1,k2,p1,p2,k3
 resolution: [640, 480]
 intrinsics: [377.62875817, 377.60522876, 307.99673203, 245.09477124]   # fx, fy, cx, cy
 
-# cam <- IMU (MSCEqF also accepts T_imu_cam and inverts it). Composed from the official
+# cam <- IMU. The engine reads T_imu_cam first and uses it as given, and inverts T_cam_imu;
+# if both are present T_imu_cam wins. The gate follows the same precedence.. Composed from the official
 # cam<-LiDAR extrinsic and the Livox IMU offset; derived, not a Kalibr measurement.
 T_cam_imu:
   - [ 0.003574361, -0.999764017, -0.021427409,  0.020304300]
@@ -41,11 +42,11 @@ timeshift_cam_imu: -0.089
 static_initializer_imu_window: 1.0
 static_initializer_acc_threshold: 0.25
 # these keys are checker_*, not the static_initializer_disparity_* of the MSCEqF README
-checker_disparity_window: 0.5
+checker_disparity_window: 0.5    # overwritten to 0 while zero_velocity_update is enabled; only live when it is disabled
 checker_disparity_threshold: 1.0
 
 # ---- propagator
-state_transition_order: 0        # 0 = first-order, -1 = numerical exp
+state_transition_order: 0        # 1 = first-order (I + H*dt); any other value = numerical matrix exp (parser default is 1)
 imu_buffer_max_size: 1000
 
 # ---- updater

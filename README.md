@@ -57,8 +57,9 @@ ros2 run vio_node vio_node --ros-args -p config_filepath:=... -p imu_topic:=/imu
 | `config_filepath` | launch: `configs/AMtown03/config.yaml` / `ros2 run`: 필수 | 설정 yaml (아래 "설정 파일") |
 | `imu_topic` | (필수; launch 기본값 `/imu/data`) | `sensor_msgs/Imu`, m/s², rad/s |
 | `cam_topic` | (필수; launch 기본값 `/camera/image_raw`) | `sensor_msgs/Image` (bgr8 / rgb8 / mono8) |
-| `qos_profile` | `reliable` | `reliable` 또는 `best_effort`. bag 재생은 `reliable`, best-effort로 publish하는 실기체 드라이버는 `best_effort` |
-| `imu_hold_max_s` | `1.0` | 카메라가 멈췄을 때 IMU를 붙들고 있는 한계. 이 시간을 넘으면 프레임 없이도 필터에 넘긴다 |
+| `qos_profile` | `reliable` | `reliable` 또는 `best_effort`. bag 재생은 `reliable`, best-effort로 publish하는 실기체 드라이버는 `best_effort`. 큐 깊이는 두 경우 모두 이미지 100 / IMU 2000 |
+| `imu_hold_max_s` | `1.0` | 카메라가 이만큼 조용하면(대기 중인 프레임이 없을 때만) IMU를 프레임 없이 필터에 넘긴다 |
+| `image_queue_max` | `30` | 처리 대기 프레임 상한. 넘으면 가장 오래된 것부터 버린다 |
 
 출력
 
@@ -67,7 +68,7 @@ ros2 run vio_node vio_node --ros-args -p config_filepath:=... -p imu_topic:=/imu
 | `odom_topic` | `/vio/odom` | `nav_msgs/Odometry` | `output_rate_hz`(기본 10 Hz) 고정. 마지막 갱신에서 IMU로 전파한 자세·위치·속도 |
 | `pose_topic` | `/vio/pose` | `geometry_msgs/PoseWithCovarianceStamped` | 필터 갱신마다 (게이트가 발화할 때, 기준 데이터에서 약 7 Hz) |
 | `path_topic` | `/vio/path` | `nav_msgs/Path` | 갱신마다 (최근 `path_max_poses`개, 기본 2000). 매번 배열 전체를 다시 보내므로 Jetson에서는 줄이거나 구독하지 않는다 |
-| `divergence_topic` | `/vio/divergence` | `std_msgs/Bool` | odom과 같은 주기 |
+| `divergence_topic` | `/vio/divergence` | `std_msgs/Bool` | odom과 같은 주기. IMU가 끊겨도 `divergence_timeout_s`/2 주기의 타이머가 계속 발행한다 |
 
 - `frame_id`(기본 `odom`): 필터 원점 기준 좌표계. z 위, 중력 −z. yaw는 임의다. REP-105의 `odom`(월드 고정이지만 드리프트하는 프레임)에 해당한다.
 - `body_frame_id`(기본 `imu`): Odometry의 `child_frame_id`. **추정값은 IMU 프레임의 자세**이므로 `base_link`가 아니다. `base_link` 자세가 필요하면 소비자가 자기 URDF의 `base_link`→`imu` static transform을 적용한다. 이 노드는 TF를 publish하지 않는다.
@@ -75,6 +76,9 @@ ros2 run vio_node vio_node --ros-args -p config_filepath:=... -p imu_topic:=/imu
 - Odometry의 `twist`는 body 좌표계(ROS 관례). 공분산은 마지막 갱신 시점의 값.
 - `divergence`는 `divergence_timeout_s`(2 s) 동안 갱신이 없거나, 위치 표준편차가 `divergence_pos_std_m`(100 m)을 넘거나, 상태가 유한하지 않으면 true.
 - `out_csv`를 주면 갱신마다 한 행씩 `run_feeder`와 같은 형식의 CSV를 쓴다 (검증용).
+- pose·odom의 공분산은 필터 내부 오차 좌표에서 ROS 관례(위치·고정축 자세, twist는 body)로 회전해 내보낸다. **보정된 값이 아니다** — 정확도 점수 모델은 미구현이다.
+- 엔진이 측정을 버리면(상태보다 오래된 프레임, propagation 실패) 갱신으로 취급하지 않는다. 종료 로그의 `rejected_updates`가 그 횟수다.
+- 들어온 영상 크기가 config의 `resolution`과 다르거나 지원하지 않는 encoding이면 프레임을 버리고 로그를 남긴다(`dropped_images`).
 
 처리 구조: 구독 콜백은 큐에 넣기만 하고 스레드 하나가 전부 처리한다. IMU는 도착 즉시 꺼내 고정 주기 출력에 쓰지만,
 필터와 게이트에는 **프레임이 경계를 지어줄 때** 넘긴다. 스탬프 t의 프레임은 t 이후 스탬프의 IMU를 본 뒤에 처리 가능해지고
@@ -92,7 +96,8 @@ ros2 run vio_node run_offline <bag_dir> configs/AMtown03/config.yaml out.csv   #
 ```
 
 `run_feeder` 옵션: `--delta-px --fire-frac --min-inject --min-ref --max-dt`(설정 파일 값 덮어쓰기), `--start S --duration D`, `--disp-log PATH`, `--track-log PATH`.
-bag 토픽 이름은 `/camera/image_raw`, `/imu/data`로 고정돼 있다.
+bag 토픽 이름은 `/camera/image_raw`, `/imu/data`로 고정돼 있다. 러너는 bag의 기록 순서대로 읽으므로,
+노드 경로와 같은 결과가 나오려면 bag이 header stamp 순서로 정렬돼 있어야 한다(우리 변환본은 그렇다).
 
 ## 설정 파일
 
@@ -134,6 +139,8 @@ MARS-LVIG AMtown03 rosbag2 기준, 새 머신에서 빌드했으면 한 번 확�
 |---|---|
 | `src/engine/vision/camera.cpp` | radtan 왜곡 계수를 4개 고정에서 4/5/8개 가능으로 (`cv::Mat`). 5계수 calib에서 첫 이미지에 죽던 문제 |
 | `src/engine/msceqf/filter/updater/updater.cpp` | clone이 없는 시각을 참조하는 트랙은 건너뜀. 비행 중간에서 시작하면 `std::out_of_range`로 죽던 문제 |
+| `src/engine/msceqf/filter/propagator/propagator.cpp` | IMU 버퍼가 가득 찼을 때의 propagate 호출을 잠금 밖으로. 같은 non-recursive mutex를 재획득해 영구 정지하던 문제(카메라가 몇 초 멈추면 도달) |
+| `include/msceqf/msceqf.hpp` | 필터 시각 접근자 추가. 엔진이 측정을 받아들였는지 호출자가 알 수 있게 |
 | 빌드 | ROS1·native·예제·테스트 경로 제거, Lie++·yaml-cpp 커밋 고정, 엔진만 원래 Release 플래그(-flto 등) |
 
 원본의 ROS2 wrapper는 쓰지 않는다. 노드는 새로 썼다: 콜백 스레드마다 필터를 돌리던 구조(재생 속도에 따라 결과가 달라짐)를 시간순 단일 처리로, 타임스탬프 nanosec 변환 오류 수정, QoS 선택 파라미터, 노드·토픽 이름 `vio_node`·`/vio/…`.

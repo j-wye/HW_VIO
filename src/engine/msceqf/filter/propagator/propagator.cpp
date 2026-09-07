@@ -16,6 +16,7 @@
 // under the License.
 //
 // You can contact the authors at <alessandro.fornasier@ieee.org>
+// This file has been modified from the original MSCEqF source.
 
 #include "msceqf/filter/propagator/propagator.hpp"
 
@@ -42,21 +43,35 @@ Propagator::Propagator(const PropagatorOptions& opts)
 
 void Propagator::insertImu(MSCEqFState& X, const SystemState& xi0, const Imu& imu, fp& timestamp)
 {
-  std::lock_guard<std::mutex> lock(mutex_);
-
-  if (imu_buffer_.empty() || imu.timestamp_ > imu_buffer_.back().timestamp_)
+  // The overflow propagation must happen with the mutex released: propagate() locks the same
+  // non-recursive mutex_, so calling it from inside the lock deadlocks the caller for good
+  // (reached whenever imu_buffer_max_size_ samples arrive without a camera update, e.g. a
+  // camera that stops for a few seconds).
+  bool overflow = false;
+  fp newest = 0;
   {
-    imu_buffer_.push_back(imu);
-  }
-  else
-  {
-    utils::Logger::warn("Received IMU measurement older then newest IMU measurement in buffer. Discarding measurement");
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if (imu_buffer_.empty() || imu.timestamp_ > imu_buffer_.back().timestamp_)
+    {
+      imu_buffer_.push_back(imu);
+    }
+    else
+    {
+      utils::Logger::warn("Received IMU measurement older then newest IMU measurement in buffer. Discarding measurement");
+    }
+
+    if (imu_buffer_.size() == imu_buffer_max_size_)
+    {
+      overflow = true;
+      newest = imu_buffer_.back().timestamp_;
+    }
   }
 
-  if (imu_buffer_.size() == imu_buffer_max_size_)
+  if (overflow)
   {
     utils::Logger::warn("Maximum imu buffer size reached. Propagating and clearing the buffer");
-    propagate(X, xi0, timestamp, imu_buffer_.back().timestamp_);
+    propagate(X, xi0, timestamp, newest);
   }
 }
 

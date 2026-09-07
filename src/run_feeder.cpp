@@ -74,9 +74,12 @@ int main(int argc, char** argv)
 
   double start_s = 0.0, duration_s = -1.0;
   std::string disp_log_path, track_log_path;
-  for (int i = 4; i + 1 < argc; i += 2)
+  int i = 4;
+  for (; i + 1 < argc; i += 2)
   {
     const std::string k = argv[i], v = argv[i + 1];
+    try
+    {
     if (k == "--delta-px")         gp.delta_px = std::stod(v);
     else if (k == "--fire-frac")   gp.fire_frac = std::stod(v);
     else if (k == "--min-inject")  gp.min_inject = std::stoi(v);
@@ -91,6 +94,22 @@ int main(int argc, char** argv)
       std::cerr << "[feeder] unknown option " << k << " (see usage; options take a value)\n";
       return 1;
     }
+    }
+    catch (const std::invalid_argument&)
+    {
+      std::cerr << "[feeder] " << k << " needs a number, got '" << v << "'\n";
+      return 1;
+    }
+    catch (const std::out_of_range&)
+    {
+      std::cerr << "[feeder] " << k << " value out of range: '" << v << "'\n";
+      return 1;
+    }
+  }
+  if (i < argc)
+  {
+    std::cerr << "[feeder] option " << argv[i] << " needs a value\n";
+    return 1;
   }
 
   vio::VioPipeline pipe(config_path, gp);

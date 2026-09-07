@@ -18,6 +18,7 @@
 #include <sensor_msgs/msg/imu.hpp>
 
 #include "msceqf/msceqf.hpp"
+#include "vio_node/pipeline.hpp"
 
 namespace
 {
@@ -43,11 +44,30 @@ int main(int argc, char** argv)
   const std::string out_path = argv[3];
   double start_s = 0.0;
   double duration_s = -1.0;
-  for (int i = 4; i + 1 < argc; i += 2)
+  int i = 4;
+  for (; i + 1 < argc; i += 2)
   {
-    const std::string k = argv[i];
-    if (k == "--start") start_s = std::stod(argv[i + 1]);
-    else if (k == "--duration") duration_s = std::stod(argv[i + 1]);
+    const std::string k = argv[i], v = argv[i + 1];
+    try
+    {
+      if (k == "--start") start_s = std::stod(v);
+      else if (k == "--duration") duration_s = std::stod(v);
+      else
+      {
+        std::cerr << "[offline] unknown option " << k << "\n";
+        return 1;
+      }
+    }
+    catch (const std::exception&)
+    {
+      std::cerr << "[offline] " << k << " needs a number, got '" << v << "'\n";
+      return 1;
+    }
+  }
+  if (i < argc)
+  {
+    std::cerr << "[offline] option " << argv[i] << " needs a value\n";
+    return 1;
   }
 
   msceqf::MSCEqF sys(config_path);
@@ -91,11 +111,10 @@ int main(int argc, char** argv)
     {
       sensor_msgs::msg::Image m;
       img_ser.deserialize_message(&ser, &m);
-      cv::Mat colour(m.height, m.width, CV_8UC3, m.data.data(), m.step);
       msceqf::Camera cam;
       cam.timestamp_ = stampToSec(m.header.stamp);
-      // must match the ros2 wrapper's cv_bridge MONO8 conversion, or the two paths differ.
-      cv::cvtColor(colour, cam.image_, cv::COLOR_BGR2GRAY);
+      // same conversion as run_feeder and the node, or the paths would not be comparable
+      cam.image_ = vio::VioPipeline::toGray(m.height, m.width, m.encoding, m.data.data(), m.step);
       sys.processMeasurement(cam);
       ++n_img;
 

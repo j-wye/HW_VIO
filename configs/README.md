@@ -28,5 +28,14 @@
 | 기체별 측정 | calib(`T_cam_imu`·intrinsics·distortion), `timeshift_cam_imu`, gyro/accel noise density(datasheet/Allan) | 측정 후 고정 |
 | 배포 기하별 | `feature_max_depth`, 창 시간 상한 | 고도·시야각에 맞게 |
 
-튜닝 대상은 없다. 성능은 시작 오프셋 ≥6개의 중앙값+범위로만 보고한다.
+고정 세트가 기본값이고, 시퀀스별 예외는 근거를 config 헤더에 남길 때만 둔다. 현재 예외:
+
+| 시퀀스 | 키 | 값 | 이유 |
+|---|---|---|---|
+| AMvalley03 | `curvature_correction` | false | |
+| HKisland03 | `num_clones` | 13 | 9 m/s라 주입률이 낮아 창이 짧다. AMtown03에 이식하면 붕괴(361 m) |
+| HKisland_GNSS03 | `num_clones` / `optical_flow_pyramid_levels` | 13 / 4 | |
+| HKairport03 | `optical_flow_win_size` | 15 | 활주로·계류장이 저텍스처. 이 시퀀스 전용 |
+
+성능은 **시작 0 단일 실행 전 구간**으로 보고하고, 통계는 그 실행 안의 60 s 창 분포로 낸다.
 ⚠️ `--delta-px`(시차 주입 임계값, px)는 `timeshift_cam_imu`(초, τ)와 다른 양이다.

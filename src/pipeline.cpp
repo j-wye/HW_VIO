@@ -11,24 +11,29 @@
 namespace vio
 {
 
-cv::Matx33d VioPipeline::loadRotationCamImu(const std::string& config_path)
+cv::Matx33d VioPipeline::loadRotationCamImu(const std::string& config_path, std::string& err)
 {
+  // Same precedence as the engine's parser: T_imu_cam wins and is used as given, T_cam_imu is
+  // inverted. The gate needs cam <- imu, so T_imu_cam's rotation block is transposed here.
   cv::Matx33d R = cv::Matx33d::eye();
+  auto read3x3 = [&R](const YAML::Node& T, bool transpose) {
+    if (!T || !T.IsSequence() || T.size() < 3) return false;
+    for (int r = 0; r < 3; ++r)
+      for (int c = 0; c < 3; ++c) R(transpose ? c : r, transpose ? r : c) = T[r][c].as<double>();
+    return true;
+  };
   try
   {
     const YAML::Node root = YAML::LoadFile(config_path);
-    const YAML::Node T = root["T_cam_imu"];
-    if (T && T.IsSequence() && T.size() >= 3)
-    {
-      for (int r = 0; r < 3; ++r)
-        for (int c = 0; c < 3; ++c) R(r, c) = T[r][c].as<double>();
-      return R;
-    }
+    if (read3x3(root["T_imu_cam"], true)) return R;
+    if (read3x3(root["T_cam_imu"], false)) return R;
   }
-  catch (const std::exception&)
+  catch (const std::exception& e)
   {
+    err = std::string("cannot read the camera-IMU extrinsic from ") + config_path + ": " + e.what();
+    return R;
   }
-  std::cerr << "[frontend] WARNING: T_cam_imu not parsed; rotation compensation disabled\n";
+  err = "neither T_imu_cam nor T_cam_imu found in " + config_path;
   return R;
 }
 
@@ -79,8 +84,16 @@ bool VioPipeline::loadGateParams(const std::string& config_path, GateParams& p, 
 }
 
 VioPipeline::VioPipeline(const std::string& config_path, const GateParams& gate)
-    : sys_(config_path), fe_(sys_.options(), loadRotationCamImu(config_path), gate)
+    : sys_(config_path), fe_(sys_.options(), loadRotationCamImu(config_path, extrinsic_err_), gate)
 {
+  if (!extrinsic_err_.empty())
+    throw std::runtime_error(extrinsic_err_ + " -- the gate cannot compensate rotation without it");
+  // Both drivers of this class feed every IMU sample stamped up to the frame before the frame
+  // itself. The engine shifts the frame stamp by timeshift_cam_imu and propagates to it, so a
+  // positive shift would target a time past every sample it was given.
+  const double ts = sys_.options().track_manager_options_.tracker_options_.cam_options_.timeshift_cam_imu_;
+  if (ts > 0.0)
+    throw std::runtime_error("timeshift_cam_imu must be <= 0 for this pipeline (got " + std::to_string(ts) + ")");
 }
 
 void VioPipeline::processImu(const msceqf::Imu& imu)
@@ -93,9 +106,13 @@ bool VioPipeline::processImage(double t_cam, const cv::Mat& gray)
 {
   msceqf::TriangulatedFeatures tf;
   if (!fe_.processImage(t_cam, gray, tf)) return false;
+  const double filter_t_before = sys_.timestamp();
   sys_.processMeasurement(tf);
   // processMeasurement shifts the stamp by timeshift_cam_imu internally
   last_emit_t_ = tf.timestamp_;
+  // The engine returns without touching the state when it discards a measurement (stamp older
+  // than the state, propagation failure). Its clock only moves on an accepted one.
+  last_accepted_ = sys_.isInit() && sys_.timestamp() > filter_t_before;
   return sys_.isInit();
 }
 
@@ -103,19 +120,31 @@ cv::Mat VioPipeline::toGray(int height, int width, const std::string& encoding, 
                             std::size_t step)
 {
   cv::Mat gray;
+  auto wrap = [&](int type) { return cv::Mat(height, width, type, const_cast<unsigned char*>(data), step); };
   if (encoding == "mono8")
   {
-    cv::Mat(height, width, CV_8UC1, const_cast<unsigned char*>(data), step).copyTo(gray);
+    wrap(CV_8UC1).copyTo(gray);
+  }
+  else if (encoding == "bgr8")
+  {
+    cv::cvtColor(wrap(CV_8UC3), gray, cv::COLOR_BGR2GRAY);
   }
   else if (encoding == "rgb8")
   {
-    cv::Mat colour(height, width, CV_8UC3, const_cast<unsigned char*>(data), step);
-    cv::cvtColor(colour, gray, cv::COLOR_RGB2GRAY);
+    cv::cvtColor(wrap(CV_8UC3), gray, cv::COLOR_RGB2GRAY);
   }
-  else  // bgr8 (the dataset encoding) and anything else 3-channel
+  else if (encoding == "bgra8")
   {
-    cv::Mat colour(height, width, CV_8UC3, const_cast<unsigned char*>(data), step);
-    cv::cvtColor(colour, gray, cv::COLOR_BGR2GRAY);
+    cv::cvtColor(wrap(CV_8UC4), gray, cv::COLOR_BGRA2GRAY);
+  }
+  else if (encoding == "rgba8")
+  {
+    cv::cvtColor(wrap(CV_8UC4), gray, cv::COLOR_RGBA2GRAY);
+  }
+  else
+  {
+    // reinterpreting an unknown layout as packed BGR silently corrupts every pixel
+    throw std::invalid_argument("unsupported image encoding '" + encoding + "'");
   }
   return gray;
 }

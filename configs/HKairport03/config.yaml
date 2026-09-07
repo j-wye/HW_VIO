@@ -1,21 +1,24 @@
 # ============================================================================
 # HKairport03 -- config.yaml (2026-09-06)
 # ============================================================================
-# Protocol: run_feeder (keyframe gate), one run from the start of the bag -- the whole
-# sequence, byte-identical input for every config. Whole-run SE3 RMSE, plus the
+# LIMITED USE: the camera re-stamps at 250-270 s, so only the first 250 s are usable.
+# Every number here was measured with --duration 250 (a run_feeder/run_offline CLI option;
+# it is not a config key), GT clock offset -2.72 s.
+# Protocol: run_feeder (keyframe gate), one run from the start of the bag, byte-identical
+# input for every config. Whole-run SE3 RMSE, plus the
 # distribution of 60 s window APEs inside that run, 1 s drift, guards (no divergence,
 # lever-arm excursion and 1 s drift not worse than the previous file, worst window not
 # beyond 1.5x the previous file's worst, covariance sane).
 # Every number below was produced by this exact file (comments aside).
 #
-# This file : SE3 10.48 m over the whole run; 60 s windows 6.84 / 10.85 / 11.15 m (median / p90 / worst),
+# This file : SE3 10.48 m over the first 250 s; 60 s windows 6.84 / 10.85 / 11.15 m (median / p90 / worst),
 #              1 s drift 0.879 m, inject 5.86 Hz, lever-arm excursion median 0.41 m, sigma/err (head) 1.44, first 250 s only, GT clock offset -2.72 s
-# Previous  : SE3 46.44 m; 60 s window median 34.02 m, 1 s drift 3.891 m  (results/harness/HKairport03/base.json)
+# Previous  : SE3 46.44 m; 60 s window median 34.02 m, 1 s drift 3.891 m  (harness base.json, working repo -- not shipped here)
 #              change -77.4 %, better on 7/7 of the 60 s windows, guards all pass
 # Changed vs previous:
 #   optical_flow_win_size = 15   -- 15 px instead of 21: runway and apron are low-texture and the larger window averages several depths into one flow vector. First 250 s only (the camera re-stamps at 250-270 s). SE3 46.44 -> 10.48 m, 60 s window median 34.02 -> 6.84, 1 s drift 3.891 -> 0.879
 # Re-checked one-at-a-time under the protocol and kept: everything else stays at the fixed set
-# Full leaderboard: results/harness/HKairport03/leaderboard.md
+# Full leaderboard (working repo, not shipped here): results/harness/HKairport03/leaderboard.md
 # ============================================================================
 # MSCEqF filter config -- HKairport03
 # Derived from the official calibration.
@@ -43,7 +46,8 @@ distortion_coeffs: [-0.0572, 0.1209, 0.00124, -0.00018, -0.06327]   # k1,k2,p1,p
 resolution: [640, 480]
 intrinsics: [379.41960784, 379.42222222, 307.47385621, 244.72875817]   # fx, fy, cx, cy
 
-# cam <- IMU (MSCEqF also accepts T_imu_cam and inverts it). Composed from the official
+# cam <- IMU. The engine reads T_imu_cam first and uses it as given, and inverts T_cam_imu;
+# if both are present T_imu_cam wins. The gate follows the same precedence.. Composed from the official
 # cam<-LiDAR extrinsic and the Livox IMU offset; derived, not a Kalibr measurement.
 T_cam_imu:
   - [ 0.003225952, -0.999733716, -0.022849283,  0.024895136]
@@ -58,11 +62,11 @@ timeshift_cam_imu: -0.09
 static_initializer_imu_window: 1.0
 static_initializer_acc_threshold: 0.25
 # these keys are checker_*, not the static_initializer_disparity_* of the MSCEqF README
-checker_disparity_window: 0.5
+checker_disparity_window: 0.5    # overwritten to 0 while zero_velocity_update is enabled; only live when it is disabled
 checker_disparity_threshold: 1.0
 
 # ---- propagator
-state_transition_order: 0        # 0 = first-order, -1 = numerical exp
+state_transition_order: 0        # 1 = first-order (I + H*dt); any other value = numerical matrix exp (parser default is 1)
 imu_buffer_max_size: 1000
 
 # ---- updater

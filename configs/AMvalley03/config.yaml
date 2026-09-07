@@ -10,12 +10,12 @@
 #
 # This file : SE3 18.88 m over the whole run; 60 s windows 13.68 / 20.10 / 23.05 m (median / p90 / worst),
 #              1 s drift 0.724 m, inject 6.35 Hz, lever-arm excursion median 0.55 m, sigma/err (head) 1.17, GT clock offset +0.00 s
-# Previous  : SE3 19.79 m; 60 s window median 14.02 m, 1 s drift 0.803 m  (results/harness/AMvalley03/base.json)
+# Previous  : SE3 19.79 m; 60 s window median 14.02 m, 1 s drift 0.803 m  (harness base.json, working repo -- not shipped here)
 #              change -4.6 %, better on 16/17 of the 60 s windows, guards all pass
 # Changed vs previous:
 #   curvature_correction = false   -- off: a small-angle correction applied across the clone window, which at 12 m/s biases the update more than it fixes. SE3 19.79 -> 18.88 m, 60 s window median 14.02 -> 13.68, 1 s drift 0.803 -> 0.724
 # Re-checked one-at-a-time under the protocol and kept: everything else stays at the fixed set
-# Full leaderboard: results/harness/AMvalley03/leaderboard.md
+# Full leaderboard (working repo, not shipped here): results/harness/AMvalley03/leaderboard.md
 # ============================================================================
 # MSCEqF filter config -- AMvalley03
 # Derived from the official calibration.
@@ -43,7 +43,8 @@ distortion_coeffs: [-0.052, 0.1168, 0.0015, 0.00013, -0.068564]   # k1,k2,p1,p2,
 resolution: [640, 480]
 intrinsics: [380.09934641, 379.83006536, 308.78888889, 245.33529412]   # fx, fy, cx, cy
 
-# cam <- IMU (MSCEqF also accepts T_imu_cam and inverts it). Composed from the official
+# cam <- IMU. The engine reads T_imu_cam first and uses it as given, and inverts T_cam_imu;
+# if both are present T_imu_cam wins. The gate follows the same precedence.. Composed from the official
 # cam<-LiDAR extrinsic and the Livox IMU offset; derived, not a Kalibr measurement.
 T_cam_imu:
   - [ 0.002980846, -0.999727682, -0.023144696,  0.019915904]
@@ -58,11 +59,11 @@ timeshift_cam_imu: -0.066
 static_initializer_imu_window: 1.0
 static_initializer_acc_threshold: 0.25
 # these keys are checker_*, not the static_initializer_disparity_* of the MSCEqF README
-checker_disparity_window: 0.5
+checker_disparity_window: 0.5    # overwritten to 0 while zero_velocity_update is enabled; only live when it is disabled
 checker_disparity_threshold: 1.0
 
 # ---- propagator
-state_transition_order: 0        # 0 = first-order, -1 = numerical exp
+state_transition_order: 0        # 1 = first-order (I + H*dt); any other value = numerical matrix exp (parser default is 1)
 imu_buffer_max_size: 1000
 
 # ---- updater
