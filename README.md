@@ -55,13 +55,7 @@ ros2 launch vio_node vio_node.launch.py
 ros2 launch vio_node vio_node.launch.py config_filepath:=/path/config.yaml cam_topic:=/cam0 qos_profile:=best_effort
 ```
 
-launch는 `config_filepath`, `imu_topic`, `cam_topic`에 AMtown03 기본값을 넣어 준다. `ros2 run`으로 직접 띄우면
-이 셋은 **직접 줘야 한다**(노드가 비어 있으면 거부한다).
-
-```bash
-ros2 run vio_node vio_node --ros-args \
-  -p config_filepath:=/path/config.yaml -p imu_topic:=/imu/data -p cam_topic:=/camera/image_raw
-```
+아래 파라미터는 전부 `이름:=값`으로 덮어쓸 수 있다. launch 파일이 기본값을 채워 주므로 따로 줄 것은 없다.
 
 **입력**
 
@@ -82,9 +76,9 @@ ros2 run vio_node vio_node --ros-args \
 | `/vio/divergence` (`divergence_topic`) | `std_msgs/Bool` | odom과 같은 주기 |
 
 `/vio/odom`은 마지막 필터 갱신 위치에서 IMU로 전파한 값이라, 갱신 주기와 무관하게 일정한 주기로 나온다.
-`/vio/path`는 매번 배열 전체를 다시 보낸다. 기본값 20000은 7 Hz 갱신 기준 약 48분치이고 AMtown03(4441개) 전 구간이 들어간다.
-RViz에서 궤적 앞부분이 잘려 보이면 이 값이 모자란 것이다. 대신 길수록 발행 대역이 커지므로
-(20000개면 한 번에 약 1 MB) Jetson에서는 줄이거나 `/vio/path`를 구독하지 않는 편이 낫다.
+`/vio/path`는 매번 배열 전체를 다시 보낸다. 기본값 5000은 7 Hz 갱신 기준 약 12분치이고 AMtown03(4441개) 전 구간이 들어간다.
+RViz에서 궤적 앞부분이 잘려 보이면 이 값이 모자란 것이다 — `path_max_poses:=0`이면 무제한이다.
+대신 길수록 발행 대역이 커지므로(5000개면 한 번에 약 280 KB) Jetson에서는 줄이거나 `/vio/path`를 구독하지 않는 편이 낫다.
 
 **좌표계.** `frame_id`(기본 `odom`)는 필터 원점 기준 좌표계다. z가 위, 중력이 −z이고 yaw는 임의다.
 드리프트하는 월드 고정 프레임이므로 REP-105의 `odom`에 해당한다.
@@ -99,7 +93,7 @@ RViz에서 궤적 앞부분이 잘려 보이면 이 값이 모자란 것이다. 
 | `output_rate_hz` | 10.0 | odom·divergence 발행 주기 |
 | `divergence_timeout_s` | 2.0 | 이 시간 동안 갱신이 없으면 divergence |
 | `divergence_pos_std_m` | 100.0 | 위치 표준편차가 이를 넘으면 divergence |
-| `path_max_poses` | 20000 | Path에 담는 최근 pose 개수. `0`이면 무제한 |
+| `path_max_poses` | 5000 | Path에 담는 최근 pose 개수. `0`이면 무제한 |
 | `image_queue_max` | 30 | 처리 대기 프레임 상한. 넘으면 오래된 것부터 버린다 |
 | `imu_hold_max_s` | 1.0 | 카메라가 이만큼 조용하면 프레임 없이 IMU를 필터에 넘긴다 |
 | `out_csv` | (없음) | 주면 갱신마다 CSV 한 행. `run_feeder` 출력과 같은 형식 (검증용) |
@@ -118,13 +112,36 @@ RViz에서 궤적 앞부분이 잘려 보이면 이 값이 모자란 것이다. 
 
 ## 오프라인 러너
 
-rosbag2를 시간순으로 직접 읽어 같은 파이프라인을 한 스레드에서 돌린다. **정확도 작업은 이쪽으로 한다** — 노드 경로는
-재생 속도에 따라 메시지가 유실될 수 있다.
+rosbag2를 시간순으로 직접 읽어 한 스레드에서 돌린다. ROS를 거치지 않으므로 재생 속도에 따른 메시지 유실이 없고,
+같은 입력이면 항상 같은 CSV가 나온다. **정확도 작업은 이쪽으로 한다.**
+
+노드가 아니라 그냥 실행파일이라(`--ros-args`를 받지 않는다) `ros2 run`으로 띄운다.
 
 ```bash
-ros2 run vio_node run_feeder  <bag_dir> configs/AMtown03/config.yaml out.csv   # keyframe 게이트 (노드와 같은 경로)
-ros2 run vio_node run_offline <bag_dir> configs/AMtown03/config.yaml out.csv   # 엔진 내부 front-end, 매 프레임 갱신
+ros2 run vio_node run_feeder  <bag_dir> configs/AMtown03/config.yaml out.csv
+ros2 run vio_node run_offline <bag_dir> configs/AMtown03/config.yaml out.csv
 ```
+
+둘의 차이는 **필터 앞단(front-end)이 무엇이고, 언제 필터를 갱신하느냐**다. 필터(MSCEqF) 자체는 완전히 같다.
+
+**`run_feeder` — 우리 keyframe 게이트.** `vio_node`가 쓰는 코드와 같다(`gated_frontend.cpp`).
+
+1. 매 프레임 특징점을 추적한다 (엔진의 `Tracker`를 그대로 쓴다).
+2. 각 특징점은 **자기 참조 프레임 대비 시차**를 누적한다. IMU 회전분을 빼서, 기체가 제자리에서 회전만 해도
+   시차가 쌓이지 않게 한다 — 회전은 삼각측량에 도움이 안 되기 때문이다.
+3. 시차가 `delta_px`를 넘은 특징점 비율이 `fire_frac` 이상이면 그 프레임을 필터에 넣는다.
+4. 넣을 때 **준비된 특징점만** 넣고, 그것들만 참조를 새로 잡는다. 나머지는 계속 누적한다.
+
+결과적으로 프레임은 10 Hz로 들어와도 필터 갱신은 약 7 Hz다(AMtown03 기준 6199프레임 → 4443회 주입).
+
+**`run_offline` — MSCEqF 원본 front-end.** 이미지를 엔진에 그대로 넘기고, 엔진의 `track_manager`가 추적·삼각측량을
+전부 처리한다. **모든 프레임에서 갱신**하므로 10 Hz다(6189회).
+
+**왜 게이트가 이득인가.** 기체가 거의 안 움직인 사이의 두 프레임을 필터에 넣으면 삼각측량 기선이 짧아 depth가
+크게 틀린다. 그 나쁜 측정이 그대로 상태에 반영된다. 게이트는 기선이 충분히 벌어졌을 때만 넣는다.
+AMtown03에서 궤적 오차가 **25.09 m 대 47.75 m**로 갈린다.
+
+그래서 `run_offline`은 배포용이 아니라 **대조군**이다. "게이트가 실제로 이득이냐"를 이 둘을 나란히 돌려 확인한다.
 
 `run_feeder` 옵션: `--delta-px --fire-frac --min-inject --min-ref --max-dt`(설정 파일 값을 덮어쓴다),
 `--start S --duration D`, `--disp-log PATH`, `--track-log PATH`. 모르는 옵션은 거부한다.

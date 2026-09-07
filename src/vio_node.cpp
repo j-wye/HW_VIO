@@ -80,7 +80,7 @@ class VioNode : public rclcpp::Node
     img_q_max_ = declare_parameter<int>("image_queue_max", 30);
     div_timeout_ = declare_parameter<double>("divergence_timeout_s", 2.0);
     div_pos_std_ = declare_parameter<double>("divergence_pos_std_m", 100.0);
-    path_max_ = declare_parameter<int>("path_max_poses", 20000);   // 0 = 무제한
+    path_max_ = declare_parameter<int>("path_max_poses", 5000);   // 0 = 무제한
     const std::string out_csv = declare_parameter<std::string>("out_csv", "");
 
     // launch validates qos_profile through `choices`, but `ros2 run` does not, so check here too.
@@ -457,7 +457,7 @@ class VioNode : public rclcpp::Node
   std::string frame_id_, body_frame_id_;
   int img_q_max_ = 30, cam_w_ = 0, cam_h_ = 0;
   double imu_hold_max_ = 1.0, period_ = 0.1, div_timeout_ = 2.0, div_pos_std_ = 100.0, gravity_ = 9.81;
-  int path_max_ = 20000;
+  int path_max_ = 5000;
 
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr sub_imu_;
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr sub_cam_;
