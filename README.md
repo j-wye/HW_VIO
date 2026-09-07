@@ -134,10 +134,8 @@ ros2 run vio_node run_feeder <bag_dir> configs/AMtown03/config.yaml out.csv
 
 프레임은 10 Hz로 들어와도 필터 갱신은 약 7 Hz다(AMtown03 기준 6199프레임 → 4443회 주입).
 기체가 거의 안 움직인 사이의 두 프레임을 넣으면 삼각측량 기선이 짧아 depth가 크게 틀리는데, 게이트가 그걸 막는다.
-AMtown03에서 게이트를 끄면 궤적 오차가 25.09 m에서 47.75 m로 나빠진다.
 
-**게이트는 끌 수 없다.** 노드와 러너 모두 이 경로만 쓴다. 값은 `config.yaml`의 `frontend:` 블록에 있고
-전 시퀀스가 같은 값을 쓴다.
+임계값은 `config.yaml`의 `frontend:` 블록에 있고, 전 시퀀스가 같은 값을 쓴다.
 
 `run_feeder` 옵션: `--delta-px --fire-frac --min-inject --min-ref --max-dt`(설정 파일 값을 덮어쓴다),
 `--start S --duration D`, `--disp-log PATH`, `--track-log PATH`. 모르는 옵션은 거부한다.
