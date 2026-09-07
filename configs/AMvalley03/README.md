@@ -15,3 +15,10 @@ In the evaluation set since 2026-09-06. tau IS constant here: measured over 4 wi
 | ground truth | `/ground_truth/fix` @5 Hz (+ `/ground_truth/velocity_ned`, `/ground_truth/yaw_raw`) |
 | timeshift_cam_imu | `-0.066` s (measured) |
 
+## 설정
+
+고정 변수 세트에서 **`curvature_correction: false`** 하나만 바꿨다.
+
+켜면 clone 창 전체에 소각 근사 보정이 걸리는데, 12 m/s에서는 고치는 것보다 갱신을 더 편향시킨다. SE3 19.79 → 18.88 m, 60 s 윈도우 중앙값 14.02 → 13.68, 1 s drift 0.803 → 0.724
+
+이 파일로 측정한 값: SE3 18.88 m, 60 s 윈도우 13.68 / 20.10 / 23.05 m, 1 s drift 0.724 m, 주입 6.35 Hz, lever-arm 이탈 중앙값 0.55 m.

@@ -1,12 +1,7 @@
-# DISABLED -- not part of the evaluation set.
-# DISABLED for quantitative work: the camera<->IMU offset is not constant over this flight (tau = +0.109 s at t=120 s, -0.089 s at t>=240 s, measured with timeshift scan). No single timeshift_cam_imu can be right, so any accuracy number from it would be an artefact of the bag. Keep the data; use it only for qualitative checks until the stamps are diagnosed and re-stamped.
-# MSCEqF filter config -- HKairport_GNSS03
-# Derived from the official calibration.
-#
-# 640x480 is the native 2448x2048 cropped by 106 rows off the top and the bottom
-# (-> 2448x1836 = 4:3) and then scaled uniformly. The sensor is 153:128, so a direct
-# resize would be anamorphic and would invalidate the radtan model.
-# Camera calib: official MARS-LVIG "HK_GNSS" group.
+# DISABLED -- 정량 평가에서 제외 (README.md 참조).
+# MSCEqF + keyframe gate config -- HKairport_GNSS03. 값의 근거와 측정 결과는 README.md.
+# 공식 MARS-LVIG "HK_GNSS" 캘리브레이션에서 유도. 640x480은 원본 2448x2048을 위아래 106행씩 잘라
+# 4:3으로 만든 뒤 균일 축소한 것이다 (직접 리사이즈하면 radtan 모델이 깨진다).
 
 # ---- initial std: attitude, velocity, position | bias | extrinsics | intrinsics
 extended_pose_std: [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-2, 1.0e-2, 1.0e-2]

@@ -17,3 +17,8 @@ DISABLED for quantitative work: the camera<->IMU offset is not constant over thi
 | ground truth | `/ground_truth/fix` @5 Hz (+ `/ground_truth/velocity_ned`, `/ground_truth/yaw_raw`) |
 | timeshift_cam_imu | `-0.089` s (measured) |
 
+## 설정
+
+고정 변수 세트를 그대로 쓴다 (`configs/README.md`). 바꾼 값 없음.
+
+**정량 평가에서 제외.** cam↔IMU 오프셋이 비행 중에 변한다(t=120 s에서 +0.109 s, t≥240 s에서 −0.089 s). 어떤 `timeshift_cam_imu` 값도 맞지 않아 여기서 나온 정확도 수치는 데이터 결함의 산물이다. 데이터는 보관하되 정성 확인에만 쓴다.

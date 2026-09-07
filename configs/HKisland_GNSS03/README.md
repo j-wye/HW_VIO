@@ -15,3 +15,10 @@ In the evaluation set since 2026-09-06 (the hardest of the four: airframe vibrat
 | ground truth | `/ground_truth/fix` @5 Hz (+ `/ground_truth/velocity_ned`, `/ground_truth/yaw_raw`) |
 | timeshift_cam_imu | `-0.092` s (measured) |
 
+## 설정
+
+고정 변수 세트를 그대로 쓴다 (`configs/README.md`). 바꾼 값 없음.
+
+이 파일로 측정한 값: SE3 12.91 m, 60 s 윈도우 4.57 / 8.86 / 10.50 m, 1 s drift 0.851 m, 주입 5.97 Hz.
+
+clone 13개와 pyramid 4단계를 함께 쓰면 60 s 윈도우가 2.4 % 좋아지지만, pyramid 4는 단독으로 이 시퀀스에서 43 %(12.91 → 18.43 m), 다른 네 시퀀스에서 40~700 % 나빠진다. 그래서 고정 세트 그대로 둔다.

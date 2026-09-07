@@ -1,29 +1,6 @@
-# ============================================================================
-# HKisland_GNSS03 -- config.yaml (2026-09-07)
-# ============================================================================
-# Protocol: run_feeder (keyframe gate), one run from the start of the bag -- the whole
-# sequence, byte-identical input for every config. Whole-run SE3 RMSE, plus the
-# distribution of 60 s window APEs inside that run, 1 s drift, guards (no divergence,
-# lever-arm excursion and 1 s drift not worse than the previous file, worst window not
-# beyond 1.5x the previous file's worst, covariance sane).
-# Every number below was produced by this exact file (comments aside).
-#
-# This file : SE3 12.91 m over the whole run; 60 s windows 4.57 / 8.86 / 10.50 m (median / p90 / worst),
-#              1 s drift 0.851 m, inject 5.97 Hz, lever-arm excursion median 0.72 m, sigma/err (head) 24.11, GT clock offset +0.00 s
-# Previous  : SE3 12.91 m; 60 s window median 4.57 m, 1 s drift 0.851 m  (results/harness/HKisland_GNSS03/base.json)
-# Changed vs previous:
-#   num_clones = 11   -- back to 11: the 13-clone setting is only viable when paired with a 4-level pyramid, and that pair buys 2.4 % on the 60 s window over the plain fixed set
-#   optical_flow_pyramid_levels = 3   -- back to the engine default 3: level 4 alone costs 43 % here (12.91 -> 18.43) and 40-700 % on the other four sequences
-# Re-checked one-at-a-time under the protocol and kept: the fixed set: extrinsics_std 0.1, accel RW 2e-3, min_track_length 4, features 120/120, min_angle_deg 2.0, pixel_std 4.0, win 21, frontend delta_px 4 / fire_frac 0.1 / min_inject 4 / max_dt 0.5
-# Full leaderboard: results/harness/HKisland_GNSS03/leaderboard.md
-# ============================================================================
-# MSCEqF filter config -- HKisland_GNSS03
-# Derived from the official calibration.
-#
-# 640x480 is the native 2448x2048 cropped by 106 rows off the top and the bottom
-# (-> 2448x1836 = 4:3) and then scaled uniformly. The sensor is 153:128, so a direct
-# resize would be anamorphic and would invalidate the radtan model.
-# Camera calib: official MARS-LVIG "HK_GNSS" group.
+# MSCEqF + keyframe gate config -- HKisland_GNSS03. 값의 근거와 측정 결과는 README.md.
+# 공식 MARS-LVIG "HK_GNSS" 캘리브레이션에서 유도. 640x480은 원본 2448x2048을 위아래 106행씩 잘라
+# 4:3으로 만든 뒤 균일 축소한 것이다 (직접 리사이즈하면 radtan 모델이 깨진다).
 
 # ---- initial std: attitude, velocity, position | bias | extrinsics | intrinsics
 extended_pose_std: [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-2, 1.0e-2, 1.0e-2]

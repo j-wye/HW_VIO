@@ -17,3 +17,12 @@ DISABLED for quantitative work: tau STEPS mid-flight, the same defect that disqu
 | ground truth | `/ground_truth/fix` @5 Hz (+ `/ground_truth/velocity_ned`, `/ground_truth/yaw_raw`) |
 | timeshift_cam_imu | `-0.09` s (measured) |
 
+## 설정
+
+고정 변수 세트에서 **`optical_flow_win_size: 15`** 하나만 바꿨다.
+
+활주로와 계류장은 텍스처가 희박해 21 px 창이 서로 다른 depth를 하나의 flow 벡터로 뭉갠다. SE3 46.44 → 10.48 m, 60 s 윈도우 중앙값 34.02 → 6.84, 1 s drift 3.891 → 0.879
+
+이 파일로 측정한 값: SE3 10.48 m, 60 s 윈도우 6.84 / 10.85 / 11.15 m, 1 s drift 0.879 m, 주입 5.86 Hz (앞 250 s 구간).
+
+**앞 250 s만 쓸 것.** 카메라가 250~270 s에서 타임스탬프를 다시 찍어 그 뒤는 어떤 timeshift로도 맞지 않는다. 측정은 `--duration 250`으로 했다(config 키가 아니라 `run_feeder` 옵션). GT 클럭 오프셋 −2.72 s.

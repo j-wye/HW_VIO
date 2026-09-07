@@ -1,43 +1,6 @@
-# ============================================================================
-# DEPLOYMENT RECIPE -- AMtown03 calibration + the fixed variable set (2026-09-04)
-# ============================================================================
-# 고정 변수 (수정하지 않음)
-#   frontend: delta_px 4, fire_frac 0.1, max_dt 0.5, min_inject 4, min_ref 0   (keyframe gate, block at the end)
-#   min_angle_deg 2.0, min_track_length 4, pixel_standerd_deviation 4.0
-#   min_features 120, max_features 120        <- the single key that decides whether the gate wins
-#   num_clones 11                              <- paired with the gate. Sequence-specific: 13 collapses AMtown03
-#                                                 (361 m) but wins on the 9 m/s HKisland sequences.
-#   extrinsics_std 0.1 x6                      <- honest prior for a DERIVED extrinsic (10 cm / 0.1 rad).
-#                                                 NOT a performance knob: 1e-2 vs 1e-1 differ within
-#                                                 start-offset chaos (medians 31.4 vs 30.0 over 8 offsets),
-#                                                 the lever arm drifts to metres from cruise start with
-#                                                 any prior (E covariance grows with the nav state), and
-#                                                 >= 0.3 m starts the slack regime. Never metres.
-#   accelerometer_random_walk 2e-3             <- transfers across 3 sequences
-# 기체별 1회 측정 후 고정
-#   T_cam_imu / intrinsics / distortion (calibration), timeshift_cam_imu (measured constant),
-#   gyro/accel noise densities (datasheet or Allan -- never tuned on APE)
-# 배포 기하별
-#   feature_max_depth (300 m is for 80 m AGL; >= 800-2300 m at 500 m), window-time cap at altitude
-#
-# Protocol: run_feeder (keyframe gate), one run from the start of the bag -- the whole
-# sequence, byte-identical input for every config. Whole-run SE3 RMSE, plus the
-# distribution of 60 s window APEs inside that run, 1 s drift, and the guards.
-# This file : SE3 25.09 m; 60 s windows 10.89 / 20.96 / 31.76 m (median / p90 / worst),
-#              1 s drift 1.199 m, inject 7.17 Hz. Gate OFF on the same file: SE3 47.75 m, 1 s drift 1.666 m.
-# Nothing was promoted here: every candidate that lowered SE3 made the 60 s window median worse.
-#
-# Run:
-#   ros2 run vio_node run_feeder <bag> <this file> <out.csv>     (gate values: `frontend:` block below)
-# opencv_threads: 1 is kept for bit-reproducible evaluation; use 0 on the vehicle.
-# ============================================================================
-# MSCEqF filter config -- AMtown03
-# Derived from the official calibration.
-#
-# 640x480 is the native 2448x2048 cropped by 106 rows off the top and the bottom
-# (-> 2448x1836 = 4:3) and then scaled uniformly. The sensor is 153:128, so a direct
-# resize would be anamorphic and would invalidate the radtan model.
-# Camera calib: official MARS-LVIG "AMtown" group.
+# MSCEqF + keyframe gate config -- AMtown03. 값의 근거와 측정 결과는 README.md.
+# 공식 MARS-LVIG "AMtown" 캘리브레이션에서 유도. 640x480은 원본 2448x2048을 위아래 106행씩 잘라
+# 4:3으로 만든 뒤 균일 축소한 것이다 (직접 리사이즈하면 radtan 모델이 깨진다).
 
 # ---- initial std: attitude, velocity, position | bias | extrinsics | intrinsics
 extended_pose_std: [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-2, 1.0e-2, 1.0e-2]

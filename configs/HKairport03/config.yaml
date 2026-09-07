@@ -1,32 +1,6 @@
-# ============================================================================
-# HKairport03 -- config.yaml (2026-09-06)
-# ============================================================================
-# LIMITED USE: the camera re-stamps at 250-270 s, so only the first 250 s are usable.
-# Every number here was measured with --duration 250 (a run_feeder/run_offline CLI option;
-# it is not a config key), GT clock offset -2.72 s.
-# Protocol: run_feeder (keyframe gate), one run from the start of the bag, byte-identical
-# input for every config. Whole-run SE3 RMSE, plus the
-# distribution of 60 s window APEs inside that run, 1 s drift, guards (no divergence,
-# lever-arm excursion and 1 s drift not worse than the previous file, worst window not
-# beyond 1.5x the previous file's worst, covariance sane).
-# Every number below was produced by this exact file (comments aside).
-#
-# This file : SE3 10.48 m over the first 250 s; 60 s windows 6.84 / 10.85 / 11.15 m (median / p90 / worst),
-#              1 s drift 0.879 m, inject 5.86 Hz, lever-arm excursion median 0.41 m, sigma/err (head) 1.44, first 250 s only, GT clock offset -2.72 s
-# Previous  : SE3 46.44 m; 60 s window median 34.02 m, 1 s drift 3.891 m  (harness base.json, working repo -- not shipped here)
-#              change -77.4 %, better on 7/7 of the 60 s windows, guards all pass
-# Changed vs previous:
-#   optical_flow_win_size = 15   -- 15 px instead of 21: runway and apron are low-texture and the larger window averages several depths into one flow vector. First 250 s only (the camera re-stamps at 250-270 s). SE3 46.44 -> 10.48 m, 60 s window median 34.02 -> 6.84, 1 s drift 3.891 -> 0.879
-# Re-checked one-at-a-time under the protocol and kept: everything else stays at the fixed set
-# Full leaderboard (working repo, not shipped here): results/harness/HKairport03/leaderboard.md
-# ============================================================================
-# MSCEqF filter config -- HKairport03
-# Derived from the official calibration.
-#
-# 640x480 is the native 2448x2048 cropped by 106 rows off the top and the bottom
-# (-> 2448x1836 = 4:3) and then scaled uniformly. The sensor is 153:128, so a direct
-# resize would be anamorphic and would invalidate the radtan model.
-# Camera calib: official MARS-LVIG "HKairport" group.
+# MSCEqF + keyframe gate config -- HKairport03. 값의 근거와 측정 결과는 README.md.
+# 공식 MARS-LVIG "HKairport" 캘리브레이션에서 유도. 640x480은 원본 2448x2048을 위아래 106행씩 잘라
+# 4:3으로 만든 뒤 균일 축소한 것이다 (직접 리사이즈하면 radtan 모델이 깨진다).
 
 # ---- initial std: attitude, velocity, position | bias | extrinsics | intrinsics
 extended_pose_std: [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-2, 1.0e-2, 1.0e-2]

@@ -1,29 +1,6 @@
-# ============================================================================
-# HKisland03 -- config.yaml (2026-09-06)
-# ============================================================================
-# Protocol: run_feeder (keyframe gate), one run from the start of the bag -- the whole
-# sequence, byte-identical input for every config. Whole-run SE3 RMSE, plus the
-# distribution of 60 s window APEs inside that run, 1 s drift, guards (no divergence,
-# lever-arm excursion and 1 s drift not worse than the previous file, worst window not
-# beyond 1.5x the previous file's worst, covariance sane).
-# Every number below was produced by this exact file (comments aside).
-#
-# This file : SE3 6.84 m over the whole run; 60 s windows 2.64 / 4.60 / 4.66 m (median / p90 / worst),
-#              1 s drift 0.476 m, inject 5.96 Hz, lever-arm excursion median 0.37 m, sigma/err (head) 2.59, GT clock offset +0.35 s
-# Previous  : SE3 12.17 m; 60 s window median 2.95 m, 1 s drift 0.595 m  (harness base.json, working repo -- not shipped here)
-#              change -43.8 %, better on 6/11 of the 60 s windows, guards all pass
-# Changed vs previous:
-#   num_clones = 13   -- 13 instead of 11: the gate injects at ~6 Hz here, so 11 clones span barely 1.8 s of a 9 m/s flight; two more lengthen the window without raising the injection rate. SE3 12.17 -> 6.84 m, 60 s window median 2.95 -> 2.64, 1 s drift 0.595 -> 0.476
-# Re-checked one-at-a-time under the protocol and kept: everything else stays at the fixed set
-# Full leaderboard (working repo, not shipped here): results/harness/HKisland03/leaderboard.md
-# ============================================================================
-# MSCEqF filter config -- HKisland03
-# Derived from the official calibration.
-#
-# 640x480 is the native 2448x2048 cropped by 106 rows off the top and the bottom
-# (-> 2448x1836 = 4:3) and then scaled uniformly. The sensor is 153:128, so a direct
-# resize would be anamorphic and would invalidate the radtan model.
-# Camera calib: official MARS-LVIG "HKisland" group.
+# MSCEqF + keyframe gate config -- HKisland03. 값의 근거와 측정 결과는 README.md.
+# 공식 MARS-LVIG "HKisland" 캘리브레이션에서 유도. 640x480은 원본 2448x2048을 위아래 106행씩 잘라
+# 4:3으로 만든 뒤 균일 축소한 것이다 (직접 리사이즈하면 radtan 모델이 깨진다).
 
 # ---- initial std: attitude, velocity, position | bias | extrinsics | intrinsics
 extended_pose_std: [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-2, 1.0e-2, 1.0e-2]

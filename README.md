@@ -14,7 +14,7 @@ src/
   engine/                                  엔진 소스 → libvio_engine.so (ROS 의존 없음)
   gated_frontend.cpp  pipeline.cpp         keyframe 게이트 + 파이프라인 (노드와 러너가 공유)
   vio_node.cpp                             ROS2 노드
-  run_feeder.cpp  run_offline.cpp          오프라인 러너
+  run_feeder.cpp                           오프라인 러너
 launch/vio_node.launch.py
 configs/<시퀀스>/config.yaml               시퀀스별 설정 (엔진 파라미터 + 게이트 값)
 ```
@@ -96,7 +96,7 @@ RViz에서 궤적 앞부분이 잘려 보이면 이 값이 모자란 것이다 �
 | `path_max_poses` | 5000 | Path에 담는 최근 pose 개수. `0`이면 무제한 |
 | `image_queue_max` | 30 | 처리 대기 프레임 상한. 넘으면 오래된 것부터 버린다 |
 | `imu_hold_max_s` | 1.0 | 카메라가 이만큼 조용하면 프레임 없이 IMU를 필터에 넘긴다 |
-| `out_csv` | (없음) | 주면 갱신마다 CSV 한 행. `run_feeder` 출력과 같은 형식 (검증용) |
+| `out_csv` | (없음) | 주면 갱신마다 CSV 한 행. `run_feeder` 출력과 같은 형식 (빌드 확인용) |
 
 `divergence`는 위 두 임계값을 넘거나 상태가 유한하지 않을 때 true다. 판정 규칙은 아직 임시다("상태" 참조).
 
@@ -118,13 +118,13 @@ rosbag2를 시간순으로 직접 읽어 한 스레드에서 돌린다. ROS를 �
 노드가 아니라 그냥 실행파일이라(`--ros-args`를 받지 않는다) `ros2 run`으로 띄운다.
 
 ```bash
-ros2 run vio_node run_feeder  <bag_dir> configs/AMtown03/config.yaml out.csv
-ros2 run vio_node run_offline <bag_dir> configs/AMtown03/config.yaml out.csv
+ros2 run vio_node run_feeder <bag_dir> configs/AMtown03/config.yaml out.csv
 ```
 
-둘의 차이는 **필터 앞단(front-end)이 무엇이고, 언제 필터를 갱신하느냐**다. 필터(MSCEqF) 자체는 완전히 같다.
+`vio_node`가 쓰는 front-end와 **같은 코드**(`gated_frontend.cpp`)를 쓴다. 그래서 이 CSV와 노드의 `out_csv`가
+같으면 노드 경로가 정상이라는 뜻이다.
 
-**`run_feeder` — 우리 keyframe 게이트.** `vio_node`가 쓰는 코드와 같다(`gated_frontend.cpp`).
+**keyframe 게이트가 하는 일**
 
 1. 매 프레임 특징점을 추적한다 (엔진의 `Tracker`를 그대로 쓴다).
 2. 각 특징점은 **자기 참조 프레임 대비 시차**를 누적한다. IMU 회전분을 빼서, 기체가 제자리에서 회전만 해도
@@ -132,16 +132,12 @@ ros2 run vio_node run_offline <bag_dir> configs/AMtown03/config.yaml out.csv
 3. 시차가 `delta_px`를 넘은 특징점 비율이 `fire_frac` 이상이면 그 프레임을 필터에 넣는다.
 4. 넣을 때 **준비된 특징점만** 넣고, 그것들만 참조를 새로 잡는다. 나머지는 계속 누적한다.
 
-결과적으로 프레임은 10 Hz로 들어와도 필터 갱신은 약 7 Hz다(AMtown03 기준 6199프레임 → 4443회 주입).
+프레임은 10 Hz로 들어와도 필터 갱신은 약 7 Hz다(AMtown03 기준 6199프레임 → 4443회 주입).
+기체가 거의 안 움직인 사이의 두 프레임을 넣으면 삼각측량 기선이 짧아 depth가 크게 틀리는데, 게이트가 그걸 막는다.
+AMtown03에서 게이트를 끄면 궤적 오차가 25.09 m에서 47.75 m로 나빠진다.
 
-**`run_offline` — MSCEqF 원본 front-end.** 이미지를 엔진에 그대로 넘기고, 엔진의 `track_manager`가 추적·삼각측량을
-전부 처리한다. **모든 프레임에서 갱신**하므로 10 Hz다(6189회).
-
-**왜 게이트가 이득인가.** 기체가 거의 안 움직인 사이의 두 프레임을 필터에 넣으면 삼각측량 기선이 짧아 depth가
-크게 틀린다. 그 나쁜 측정이 그대로 상태에 반영된다. 게이트는 기선이 충분히 벌어졌을 때만 넣는다.
-AMtown03에서 궤적 오차가 **25.09 m 대 47.75 m**로 갈린다.
-
-그래서 `run_offline`은 배포용이 아니라 **대조군**이다. "게이트가 실제로 이득이냐"를 이 둘을 나란히 돌려 확인한다.
+**게이트는 끌 수 없다.** 노드와 러너 모두 이 경로만 쓴다. 값은 `config.yaml`의 `frontend:` 블록에 있고
+전 시퀀스가 같은 값을 쓴다.
 
 `run_feeder` 옵션: `--delta-px --fire-frac --min-inject --min-ref --max-dt`(설정 파일 값을 덮어쓴다),
 `--start S --duration D`, `--disp-log PATH`, `--track-log PATH`. 모르는 옵션은 거부한다.
@@ -166,21 +162,21 @@ frontend:          # keyframe 게이트. 블록이 없으면 아래 값을 기�
 `frontend:` 안에 모르는 키가 있으면 에러다. 오타가 조용히 기본값으로 떨어지지 않게 하기 위한 것이다.
 `opencv_threads`는 1이면 결과가 비트 단위로 재현되고, 0이면 모든 코어를 쓴다(마지막 비트가 달라질 수 있다).
 
-## 회귀 확인
+## 빌드 확인
 
-MARS-LVIG AMtown03 rosbag2로 확인한 값이다. 새 머신에서 빌드했으면 한 번 돌려 본다.
+빌드가 제대로 됐는지 보는 절차다. 정확도를 재는 것이 아니라, **이 머신에서 빌드한 결과가 우리 것과 같은지**만 본다.
+MARS-LVIG AMtown03 rosbag2가 필요하다.
 
-| | 명령 | 기대값 |
-|---|---|---|
-| 게이트 ON | `run_feeder <bag> configs/AMtown03/config.yaml on.csv` | `injections 4443, poses 4441` |
-| 게이트 OFF | `run_offline <bag> configs/AMtown03/config.yaml off.csv` | `images=6199 imu=129049 poses=6189` |
-| 노드 | `ros2 bag play <bag> --delay 3` + `out_csv` | `run_feeder` 출력과 동일 |
+```bash
+ros2 run vio_node run_feeder <bag> configs/AMtown03/config.yaml /tmp/on.csv
+```
 
-세 실행 모두 종료 시 stderr에 위 숫자를 찍는다. 궤적 정확도는 별도 평가 도구로 재며 이 저장소에 포함하지 않는다.
+종료할 때 stderr에 `injections=4443 poses=4441`이 찍히면 정상이다. 이 숫자는 게이트가 몇 번 발화했고 필터가 몇 번
+갱신했는지라서, 빌드나 설정이 어긋나면 바로 달라진다.
 
-노드로 확인할 때 `--delay 3`은 필요하다. 없으면 discovery가 끝나기 전 앞부분을 놓친다. 실시간(1배속)에서는
-메시지 유실이 없지만 `--rate 4`처럼 빠르게 재생하면 개발 데스크탑에서도 IMU가 몇 개 유실돼 결과가 달라진다.
-빠른 재생은 기동 확인에만 쓴다.
+노드 경로까지 보려면 `out_csv`를 주고 같은 bag을 1배속으로 재생한 뒤 위 CSV와 비교한다. 같으면 노드가 러너와 같은
+계산을 한 것이다. `ros2 bag play`에는 `--delay 3`이 필요하다 — 없으면 discovery가 끝나기 전 앞부분을 놓친다.
+`--rate 4`처럼 빠르게 재생하면 개발 데스크탑에서도 IMU가 몇 개 유실돼 결과가 달라지므로 기동 확인에만 쓴다.
 
 ## MSCEqF에서 바뀐 것
 
@@ -197,7 +193,7 @@ MARS-LVIG AMtown03 rosbag2로 확인한 값이다. 새 머신에서 빌드했으
 원본의 ROS2 wrapper는 쓰지 않는다. 노드는 새로 썼다. 원본은 콜백 스레드마다 필터를 돌려 재생 속도에 따라 결과가
 달라졌고, 타임스탬프 nanosec 변환에 오류가 있었다.
 
-우리가 새로 쓴 것: keyframe 게이트 front-end(`gated_frontend.cpp`), 파이프라인(`pipeline.cpp`), 오프라인 러너,
+우리가 새로 쓴 것: keyframe 게이트 front-end(`gated_frontend.cpp`), 파이프라인(`pipeline.cpp`), 오프라인 러너(`run_feeder.cpp`),
 ROS2 노드(`vio_node.cpp`), 10 Hz 전파 출력, divergence 플래그.
 
 ## 라이선스

@@ -6,7 +6,7 @@ project(vio_node VERSION 0.1 LANGUAGES CXX)
 #   src/engine/                                      엔진 소스 → libvio_engine.so (ROS 의존 없음)
 #   include/vio_node/, src/{gated_frontend,pipeline}.cpp   keyframe 게이트 front-end + 파이프라인 (노드·러너 공용)
 #   src/vio_node.cpp                                 ROS2 노드
-#   src/run_offline.cpp, src/run_feeder.cpp          결정적 오프라인 러너
+#   src/run_feeder.cpp                               결정적 오프라인 러너
 # ROS2 Humble 전용.
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -111,15 +111,11 @@ add_executable(run_feeder src/run_feeder.cpp)
 ament_target_dependencies(run_feeder rclcpp rosbag2_cpp rosbag2_storage sensor_msgs)
 target_link_libraries(run_feeder vio_pipeline)
 
-add_executable(run_offline src/run_offline.cpp)
-ament_target_dependencies(run_offline rclcpp rosbag2_cpp rosbag2_storage sensor_msgs)
-target_link_libraries(run_offline vio_pipeline)
-
 install(TARGETS vio_engine
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
-install(TARGETS vio_node run_feeder run_offline DESTINATION lib/${PROJECT_NAME})
+install(TARGETS vio_node run_feeder DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY launch configs DESTINATION share/${PROJECT_NAME})
 
 # No downstream C++ interface is exported: the engine headers pull in Lie++, which FetchContent
