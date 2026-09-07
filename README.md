@@ -45,8 +45,8 @@ source install/setup.bash
 
 Lie++, yaml-cpp, Eigen은 CMake가 빌드 중에 받아온다 — 첫 빌드에 네트워크가 필요하다. 커밋을 고정해 두었다.
 
-`lto-wrapper: warning: using serial compilation of N LTRANS jobs`는 정상 출력이다.
 엔진이 `-march=native`로 빌드되므로 **실행할 머신(Jetson)에서 직접 빌드해야 한다.** 다른 CPU에서 만든 바이너리는 돌지 않는다.
+엔진은 `-flto=auto`로 링크한다. 메모리가 빠듯한 보드에서 LTO 링크가 죽으면 `-flto`(직렬)로 바꾸거나 swap을 확보한다.
 
 ## 실행
 

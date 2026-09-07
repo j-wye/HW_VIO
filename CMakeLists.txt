@@ -19,14 +19,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # 반드시 ROS find_package보다 먼저: ROS 쪽이 먼저 imported 타깃 `yaml-cpp`와 `uninstall`을 만들면
 # FetchContent의 yaml-cpp/Eigen이 같은 이름을 못 만들어 configure가 깨진다.
 include(FetchContent)
+set(LIEPP_PIN   ec459c38445d986b5830162ae428b8b242ce5021)   # Eigen도 함께 가져온다
+set(YAMLCPP_PIN c3f81127320662deb3e28f4da0a511f1faecd860)
 FetchContent_Declare(LiePlusPlus
   GIT_REPOSITORY https://github.com/aau-cns/Lie-plusplus
-  GIT_TAG        ec459c38445d986b5830162ae428b8b242ce5021   # 커밋 고정 (Eigen도 함께 가져온다)
+  GIT_TAG        ${LIEPP_PIN}
   GIT_PROGRESS   TRUE)
 set(LIEPLUSPLUS_TESTS OFF)
 FetchContent_Declare(yaml-cpp
   GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
-  GIT_TAG        c3f81127320662deb3e28f4da0a511f1faecd860   # 커밋 고정
+  GIT_TAG        ${YAMLCPP_PIN}
   GIT_PROGRESS   TRUE)
 find_package(Boost REQUIRED)
 find_package(OpenCV 4 REQUIRED)
@@ -34,7 +36,9 @@ FetchContent_MakeAvailable(LiePlusPlus yaml-cpp)
 # Lie++/yaml-cpp 헤더는 타깃의 INTERFACE include로 들어온다. 전역 include에 넣지 말 것:
 # Lie++에도 utils/tools.hpp가 있어 우리 include/utils/tools.hpp를 가린다.
 
-message(STATUS "Eigen VER: ${EIGEN3_VERSION}  Lie++ VER: ${LiePlusPlus_VERSION}  yaml-cpp VER: ${YAML_CPP_VERSION}  Boost VER: ${Boost_VERSION}  OpenCV VER: ${OpenCV_VERSION}")
+# FetchContent 하위 프로젝트의 <pkg>_VERSION은 부모 스코프로 올라오지 않아 전부 빈 문자열로 찍혔다.
+# 우리가 통제하는 값(고정한 커밋)과 시스템에서 찾은 값만 남긴다.
+message(STATUS "Boost ${Boost_VERSION}  OpenCV ${OpenCV_VERSION}  Lie++ ${LIEPP_PIN}  yaml-cpp ${YAMLCPP_PIN}")
 
 ## ROS2 ---------------------------------------------------------------------------------------
 find_package(ament_cmake REQUIRED)
@@ -50,7 +54,7 @@ endforeach()
 # 들어가면 non-LTO인 libyaml-cpp.a와 섞여 링크가 깨진다.
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native")
 set(ENGINE_FLAGS_WANTED -DNDEBUG -O3 -fsee -fomit-frame-pointer -fno-signed-zeros -fno-math-errno
-    -funroll-loops -fno-unsafe-math-optimizations -flto -march=native)
+    -funroll-loops -fno-unsafe-math-optimizations -flto=auto -march=native)
 include(CheckCXXCompilerFlag)
 set(ENGINE_FLAGS "")
 foreach(FLAG ${ENGINE_FLAGS_WANTED})
