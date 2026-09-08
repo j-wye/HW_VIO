@@ -86,7 +86,6 @@ ros2 launch vio_node vio_node.launch.py config_filepath:=/path/config.yaml cam_t
 | `/vio/odom` | `nav_msgs/Odometry` | `output_rate_hz` (10 Hz) | 마지막 filter update + IMU propagation |
 | `/vio/pose` | `geometry_msgs/PoseWithCovarianceStamped` | Filter Update | update 시점 값 그대로, propagation 없음 |
 | `/vio/path` | `nav_msgs/Path` | Filter Update | Accumulated path publish |
-| `/vio/divergence` | `std_msgs/Bool` | `output_rate_hz` (10 Hz) | timeout · `pos_std` · non-finite |
 
 **Parameters**
 
@@ -94,9 +93,7 @@ ros2 launch vio_node vio_node.launch.py config_filepath:=/path/config.yaml cam_t
 |---|---|---|
 | `frame_id` | `odom` | filter origin 기준. z-up, gravity −z, yaw arbitrary |
 | `body_frame_id` | `imu` | Odometry `child_frame_id`. `base_link` 아님 |
-| `output_rate_hz` | 10.0 | odom·divergence 발행 주기 |
-| `divergence_timeout_s` | 2.0 | 이 시간 동안 갱신이 없으면 divergence |
-| `divergence_pos_std_m` | 100.0 | position std가 넘으면 divergence |
+| `output_rate_hz` | 10.0 | odom 발행 주기 |
 | `path_max_poses` | 5000 | Path에 담는 최근 pose 개수. `0`이면 무제한 |
 | `image_queue_max` | 30 | 초과 시 오래된 frame부터 drop |
 | `imu_hold_max_s` | 1.0 | 카메라가 이만큼 조용하면 frame 없이 IMU를 filter로 |
@@ -201,10 +198,9 @@ ros2 run vio_node run_feeder AMtown03
 달라졌고, 타임스탬프 nanosec 변환에 오류가 있었다.
 
 우리가 새로 쓴 것: keyframe 게이트 front-end(`gated_frontend.cpp`), 파이프라인(`pipeline.cpp`), 오프라인 러너(`run_feeder.cpp`),
-ROS2 노드(`vio_node.cpp`), 10 Hz 전파 출력, divergence 플래그.
+ROS2 노드(`vio_node.cpp`), 10 Hz 전파 출력.
 
 ## Future Work
 - **Confidence Scrore**
 - **WGS84/NED transfer** 현재 필터 원점 기준 좌표만 낸다.
 - **TF publish**
-- `divergence` 판정은 위의 단순 규칙이다.
