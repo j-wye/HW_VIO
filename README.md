@@ -21,11 +21,10 @@ configs/<시퀀스>/config.yaml               시퀀스별 설정 (엔진 파라
 
 ## 설치
 
-Ubuntu 22.04 / ROS2 Humble. 디스크는 데이터셋 때문에 **45 GB 이상** 비어 있어야 한다(zip 21 GB + 압축 해제 21 GB).
+Ubuntu 22.04 / ROS2 Humble. 디스크는 데이터셋 때문에 **45 GB 이상** 비어 있어야 한다(압축 21 GB + 해제 21 GB).
 
 ```bash
-sudo apt install git unzip python3-colcon-common-extensions python3-rosdep
-python3 -m pip install gdown
+sudo apt install git python3-colcon-common-extensions python3-rosdep
 ```
 
 **1. 워크스페이스와 패키지**
@@ -35,21 +34,36 @@ mkdir -p ~/hanwha/src
 git clone https://github.com/j-wye/HW_VIO.git ~/hanwha/src/vio_node
 ```
 
-**2. 데이터셋** (MARS-LVIG 시퀀스의 rosbag2 변환본, 21.4 GB)
+**2. 데이터셋** (MARS-LVIG 시퀀스의 rosbag2 변환본, 시퀀스당 4~6 GB)
+
+아래 네 개를 브라우저로 눌러 **전부** `~/Downloads`에 받는다. 시퀀스 하나에 파일 하나다.
+
+- https://drive.google.com/file/d/1p1vz40NBtruBvdrEWW66WqU1A9vXY9A_/view?usp=drive_link
+- https://drive.google.com/file/d/14CVP-OpuUyURa9ks-Dhs0S61OjfhUfNx/view?usp=drive_link
+- https://drive.google.com/file/d/1GEHYUk_hRmk8kg16y5KBDroBcoXceers/view?usp=drive_link
+- https://drive.google.com/file/d/1uFH0lDnHZihZU1Y58YDkg43DhbGivjz0/view?usp=drive_link
+
+받은 자리에서 풀면 시퀀스 폴더가 그대로 나온다.
 
 ```bash
-cd ~/hanwha/src
-gdown 1WpPCvj6n-_g99b8_OwjQYuYs4JMf-vKi -O datasets.zip
-test -s datasets.zip || { echo "다운로드 실패"; exit 1; }
-unzip -q datasets.zip && rm datasets.zip
-touch datasets/COLCON_IGNORE
+mkdir -p ~/hanwha/src/datasets
+cd ~/hanwha/src/datasets
+for f in ~/Downloads/*.tar.gz; do echo "$f"; tar xzf "$f"; done
+touch COLCON_IGNORE
 ```
 
 `COLCON_IGNORE`는 colcon이 21 GB짜리 데이터셋 트리를 매번 훑지 않게 한다.
 
-용량이 커서 gdown이 빈 파일만 남기고 끝나는 경우가 있다 — 위의 `test -s`가 그때 멈춘다.
-그러면 다시 실행하거나(이어받지는 않는다), 브라우저로 직접 받아 `~/hanwha/src/datasets.zip`에 두고
-`unzip`부터 이어서 한다.
+네 개가 다 풀렸는지 확인한다. 빠진 것이 있으면 그 시퀀스는 못 돌린다.
+
+```bash
+cd ~/hanwha/src/datasets
+for s in AMtown03 AMvalley03 HKisland03 HKisland_GNSS03; do
+  test -f "$s/metadata.yaml" && echo "OK   $s" || echo "MISSING $s"
+done
+```
+
+전부 `OK`면 `~/Downloads`의 `.tar.gz`는 지워도 된다.
 
 **3. 의존성과 빌드**
 
