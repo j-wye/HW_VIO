@@ -2,7 +2,7 @@
 
 380 s, 3800 images, 1.7 km path, AGL 85 m, cruise **9.0 m/s**, Hong Kong.
 
-In the evaluation set since 2026-09-06. The RTK clock leads the camera/IMU clock here: the 1 s drift is minimised at gt_time_offset +0.35 s (heading-rate/gyro cross-correlation peaks at +0.52 s with a broad maximum), so it is scored with +0.35 s. It does NOT inherit the HKairport_GNSS03 defect: tau measured over 4 windows (110/180/250/310 s) at -0.0915/-0.0962/-0.0933/-0.0899, spread 6.3 ms with all four gains at -1.00 +/- 0.015, versus HKairport swinging +0.109 -> -0.089 (198 ms). Adopted -0.092 (R^2-weighted). Different flight and date (2022-11-29) from HKairport_GNSS03 (2023-10-25), so the shared site name is not shared hardware state. Adds a 9.0 m/s speed point below AMtown03 (11.9 m/s) over terrain unlike it, and its /height is clean (corr 0.955, residual std 7.8 m).
+In the evaluation set since 2026-09-06. The RTK clock leads the camera/IMU clock here: the 1 s drift is minimised at gt_time_offset +0.35 s (heading-rate/gyro cross-correlation peaks at +0.52 s with a broad maximum), so it is scored with +0.35 s. tau is stable here: measured over 4 windows (110/180/250/310 s) at -0.0915/-0.0962/-0.0933/-0.0899, spread 6.3 ms with all four gains at -1.00 +/- 0.015. Adopted -0.092 (R^2-weighted). Flown 2022-11-29. Adds a 9.0 m/s speed point below AMtown03 (11.9 m/s) over terrain unlike it, and its /height is clean (corr 0.955, residual std 7.8 m).
 
 | | |
 |---|---|
