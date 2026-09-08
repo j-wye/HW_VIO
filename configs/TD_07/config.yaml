@@ -1,0 +1,111 @@
+# MSCEqF + keyframe gate config -- TD_07. 값의 근거와 측정 결과는 README.md.
+# 카메라·IMU 값은 데이터셋에 같이 온 Kalibr 결과 그대로다 (유도값이 아니다).
+# 640x480은 원본 2048x1536을 균일 축소만 한 것 -- 원본이 이미 4:3이라 크롭이 없다.
+#
+# ⛔ 현재 이 시퀀스는 발산한다 (전 구간 APE 325 km, 경로비 340). 평가에 쓰지 말 것.
+#    원인은 config가 아니라 기하다: 150 m 상공을 8 m/s로 날아 삼각측량 기선이
+#    AMtown03의 1/5이고, 자이로 bias 0.25 deg/s를 시각으로 못 잡아 자세가 드리프트한다.
+#    자세 1도가 기울면 중력이 0.17 m/s^2 새어 속도가 계속 오른다.
+#    엔진 자체 front-end로 돌려도 같으므로 게이트 문제가 아니다.
+# ---- initial std: attitude, velocity, position | bias | extrinsics | intrinsics
+extended_pose_std: [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-2, 1.0e-2, 1.0e-2]
+bias_std:          [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1]
+extrinsics_std: [1.0e-2, 1.0e-2, 1.0e-2, 1.0e-2, 1.0e-2, 1.0e-2]   # Kalibr 실측이라 유도값(1e-1)보다 좁게 준다
+intrinsics_std:    [1.0, 1.0, 1.0, 1.0]
+
+# ---- IMU noise (kalibr_imu_chain.yaml 실측, 200 Hz)
+accelerometer_noise_density: 1.2014723e-02
+accelerometer_random_walk:   2.0829747e-04
+gyroscope_noise_density:     9.2653692e-03
+gyroscope_random_walk:       9.5533980e-05
+
+# ---- camera (Kalibr convention)
+distortion_model: radtan
+distortion_coeffs: [-0.08683013432585018, 0.0701894251004425, -0.0007017351213969548, -0.000460579496909797]   # k1,k2,p1,p2; 균일 축소에 불변
+resolution: [640, 480]
+intrinsics: [373.45378775, 369.67595819, 312.99168228, 234.10576142]   # fx, fy, cx, cy = s*f, s*(c+0.5)-0.5 with s=640/2048
+
+# IMU <- cam. kalibr_imucam_chain.yaml의 행렬이 "R_CtoI, p_CinI"(카메라->IMU)라고 명시돼 있어
+# 그대로 T_imu_cam에 넣는다. 엔진은 T_imu_cam을 있는 그대로 쓰고 T_cam_imu는 뒤집는다.
+# 광축이 IMU 좌표로 [-0.010, 0.013, -1.000] -- 하방(nadir).
+T_imu_cam:
+  - [ 0.999904003, -0.009500444, -0.010085959, -0.056523820]
+  - [-0.009364546, -0.999865871,  0.013436740, -0.002460980]
+  - [-0.010212261, -0.013341000, -0.999858854, -0.081108020]
+  - [ 0.000000000,  0.000000000,  0.000000000,  1.000000000]
+
+# Applied as cam.timestamp_ += timeshift_cam_imu, i.e. the value is tau = t_imu - t_cam.
+# 실측 +0.0046 s (40 s 창 t=60/200/380 에서 +0.0046/+0.0038/+0.0055, R2 0.95~0.99).
+# Kalibr 파일의 time_offset -0.01과 부호가 반대다 -- 실측을 따른다.
+# 파이프라인이 양수 tau를 못 받아 0으로 둔다. 8 m/s에서 4.6 ms는 3.7 cm, 회전은 0.003도라 무시할 수준.
+timeshift_cam_imu: 0.0
+# ---- 주어진 상태로 초기화. TD_07은 처음부터 8 m/s 비행 중이라 정지 구간이 없고,
+# ---- static initializer가 중력 방향을 못 잡는다. 값은 첫 프레임 시각의 GT에서 왔다.
+# ---- b0의 자이로 성분은 실측 bias다 (자이로 - GT각속도 중앙값, 0.25 deg/s).
+# ---- 이걸 안 주면 25초에 자세가 6.6도 틀어지고 중력이 새어 속도가 8 -> 27 m/s로 오른다.
+init_with_given_state: true
+q0: [0.044374804, -0.057849753, -0.692650682, 0.717578787]   # qx qy qz qw, body->ENU
+p0: [0.0, 0.0, 0.0]
+v0: [-7.858410, -2.197432, -0.036580]                        # ENU m/s
+b0: [-0.00191, -0.00389, -0.00065, 0.0632, -0.0837, 0.0038]  # [bg(3), ba(3)]
+t0: 1679129146.8283
+
+
+# ---- initialiser
+static_initializer_imu_window: 1.0
+static_initializer_acc_threshold: 0.25
+# these keys are checker_*, not the static_initializer_disparity_* of the MSCEqF README
+checker_disparity_window: 0.5    # overwritten to 0 while zero_velocity_update is enabled; only live when it is disabled
+checker_disparity_threshold: 1.0
+
+# ---- propagator
+state_transition_order: 0        # 1 = first-order (I + H*dt); any other value = numerical matrix exp (parser default is 1)
+imu_buffer_max_size: 1000
+
+# ---- updater
+refine_traingulation: true       # sic (MSCEqF key name)
+feature_min_depth: 0.2          # 하방 150 m라 이보다 가까울 일이 없다 (거리계 실측 최소 135 m)
+feature_max_depth: 1000.0       # 하방 150 m, 화면 모서리도 220 m. 300(4개 시퀀스 값)은 여기선 걸린다
+feature_refinement_max_iterations: 20
+feature_refinement_tollerance: 1e-10
+measurement_projection_method: unit_plane
+feature_representation: anchored_inverse_depth
+pixel_standerd_deviation: 4.0    # sic (MSCEqF key name)
+curvature_correction: true
+min_track_length: 4
+min_angle_deg: 2.0
+zero_velocity_update: enabled
+
+# ---- state
+enable_camera_intrinsic_calibration: false
+gravity: 9.81
+num_clones: 11
+num_persistent_features: 0
+
+# ---- tracker
+equalization_method: histogram
+feature_detector: fast
+fast_threshold: 20
+shi_tomasi_quality_level: 0.75   # only read when feature_detector is shi-tomasi
+optical_flow_pyramid_levels: 3
+optical_flow_win_size: 21
+detector_pyramid_levels: 1
+grid_x_size: 4
+grid_y_size: 4
+min_feature_pixel_distance: 15
+min_features: 120
+max_features: 120
+ransac_reprojection: 0.5
+opencv_threads: 1                # 1 = bit-reproducible; use 0 on the vehicle
+
+max_track_length: 400
+logger_level: 1
+
+# ---- keyframe gate (front-end). run_feeder and vio_node read this block; the values are the
+# ---- deployment recipe and are the same for every sequence.
+frontend:
+  delta_px: 4.0
+  fire_frac: 0.1
+  min_inject: 4
+  min_ref: 0
+  max_dt: 0.5

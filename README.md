@@ -1,43 +1,35 @@
 # vio_node
 
-카메라 한 대와 IMU로 위치·자세를 추정하는 ROS2 Humble 패키지. 필터는 MSCEqF이고, 그 앞단의 keyframe 게이트와
-ROS 노드, 오프라인 러너를 이 저장소에서 구현했다.
-
-노드는 `sensor_msgs/Imu`와 `sensor_msgs/Image`를 구독해 `nav_msgs/Odometry`를 10 Hz로 낸다.
+**Integration Pipeline** : Filter based VIO Algorithm *MSCEqF* 를 기반으로, frontend에서 keyframe gate 와
+ROS node, offline test runner 통합
 
 ```
-CMakeLists.txt  package.xml  LICENSE
 include/
-  msceqf/ vision/ utils/ types/ sensors/   MSCEqF 엔진 헤더
-  vio_node/                                게이트·파이프라인 헤더
+  msceqf/ vision/ utils/ types/ sensors/   MSCEqF header
+  vio_node/                                keyframe gate + pipeline header
 src/
-  engine/                                  엔진 소스 → libvio_engine.so (ROS 의존 없음)
-  gated_frontend.cpp  pipeline.cpp         keyframe 게이트 + 파이프라인 (노드와 러너가 공유)
-  vio_node.cpp                             ROS2 노드
-  run_feeder.cpp                           오프라인 러너
-launch/vio_node.launch.py
-configs/<시퀀스>/config.yaml               시퀀스별 설정 (엔진 파라미터 + 게이트 값)
+  engine/                                  engine source → libvio_engine.so
+  gated_frontend.cpp  pipeline.cpp         keyframe gate + pipeline source
+  vio_node.cpp                             ROS2 node
+  run_feeder.cpp                           Offline runner
+launch/
+  vio_node.launch.py
+configs/
+  $DATASET/config.yaml                     시퀀스별 설정 (엔진 파라미터 + 게이트 값)
+LICENSE
+CMakeLists.txt
+package.xml
 ```
 
-## 설치
-
-Ubuntu 22.04 / ROS2 Humble. 디스크는 데이터셋 때문에 **45 GB 이상** 비어 있어야 한다(압축 21 GB + 해제 21 GB).
+## Installation
 
 ```bash
 sudo apt install git python3-colcon-common-extensions python3-rosdep
-```
-
-**1. 워크스페이스와 패키지**
-
-```bash
 mkdir -p ~/hanwha/src
 git clone https://github.com/j-wye/HW_VIO.git ~/hanwha/src/vio_node
 ```
 
-**2. 데이터셋** (MARS-LVIG 시퀀스의 rosbag2 변환본, 시퀀스당 4~6 GB)
-
-아래 네 개를 `~/Downloads`에 받는다.
-
+### Datasets
 - https://drive.google.com/file/d/1p1vz40NBtruBvdrEWW66WqU1A9vXY9A_/view?usp=drive_link
 - https://drive.google.com/file/d/14CVP-OpuUyURa9ks-Dhs0S61OjfhUfNx/view?usp=drive_link
 - https://drive.google.com/file/d/1GEHYUk_hRmk8kg16y5KBDroBcoXceers/view?usp=drive_link
@@ -53,97 +45,65 @@ tar -zxvf HKisland_GNSS03.tar.gz -C ~/hanwha/src/datasets
 touch ~/hanwha/src/datasets/COLCON_IGNORE
 ```
 
-`COLCON_IGNORE`가 있어야 colcon이 21 GB짜리 데이터셋 트리를 훑지 않는다.
-
-**3. 의존성과 빌드**
-
-의존성은 `package.xml`에 선언돼 있고 `rosdep`이 그대로 설치한다.
-
+### Dependency & Build
 ```bash
 cd ~/hanwha
-sudo rosdep init && rosdep update          # 이 머신에서 처음 한 번만
+sudo rosdep init && rosdep update
 rosdep install --from-paths src --ignore-src -y
 source /opt/ros/humble/setup.bash
 colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
 source install/setup.bash
 ```
-
-끝나면 이런 모양이 된다.
-
+then project structure follows:
 ```
-~/hanwha/
-  build/ install/ log/        colcon 산출물
+/hanwha/
+  build/ install/ log/
   src/
-    vio_node/                 이 저장소
-    datasets/<시퀀스>/         rosbag2
+    vio_node/
+    datasets/
 ```
 
-Lie++, yaml-cpp, Eigen은 CMake가 빌드 중에 받아온다 — 첫 빌드에 네트워크가 필요하다. 커밋을 고정해 두었다.
-
-엔진이 `-march=native`로 빌드되므로 **실행할 머신(Jetson)에서 직접 빌드해야 한다.** 다른 CPU에서 만든 바이너리는 돌지 않는다.
-엔진은 `-flto=auto`로 링크한다. 메모리가 빠듯한 보드에서 LTO 링크가 죽으면 `-flto`(직렬)로 바꾸거나 swap을 확보한다.
-
-## 실행
-
+## Execution
 ```bash
 ros2 launch vio_node vio_node.launch.py
 ros2 launch vio_node vio_node.launch.py config_filepath:=/path/config.yaml cam_topic:=/cam0 qos_profile:=best_effort
 ```
+<details>
+<summary> I/O & Params</summary>
 
-아래 파라미터는 전부 `이름:=값`으로 덮어쓸 수 있다. launch 파일이 기본값을 채워 주므로 따로 줄 것은 없다.
-
-**입력**
-
-| 파라미터 | launch 기본값 | 설명 |
+**Input**
+| Parameter | Default | Description |
 |---|---|---|
-| `config_filepath` | `configs/AMtown03/config.yaml` | 설정 파일. 아래 "설정" 참조 |
-| `imu_topic` | `/imu/data` | `sensor_msgs/Imu`. 가속도 m/s², 각속도 rad/s |
+| `config_filepath` | `configs/AMtown03/config.yaml` | config.yaml |
+| `imu_topic` | `/imu/data` | `sensor_msgs/Imu`. $\mathbf{a}$ (m/s²), $\boldsymbol{\omega}$ (rad/s) |
 | `cam_topic` | `/camera/image_raw` | `sensor_msgs/Image`. mono8 / bgr8 / rgb8 / bgra8 / rgba8 |
-| `qos_profile` | `reliable` | `reliable` \| `best_effort`. bag 재생은 `reliable`, best-effort로 내보내는 실기체 드라이버는 `best_effort` |
+| `qos_profile` | `reliable` | `reliable` \| `best_effort` publisher와 match (bag = `reliable`, 실기체 드라이버 = `best_effort`) |
 
-**출력**
+**Output**
 
-| 토픽 (파라미터) | 메시지 | 주기 |
+| Topic | message | Hz | Description |
+|---|---|---|---|
+| `/vio/odom` | `nav_msgs/Odometry` | `output_rate_hz` (10 Hz) | 마지막 filter update + IMU propagation |
+| `/vio/pose` | `geometry_msgs/PoseWithCovarianceStamped` | Filter Update | update 시점 값 그대로, propagation 없음 |
+| `/vio/path` | `nav_msgs/Path` | Filter Update | Accumulated path publish |
+| `/vio/divergence` | `std_msgs/Bool` | `output_rate_hz` (10 Hz) | timeout · `pos_std` · non-finite |
+
+**Parameters**
+
+| Parameter | Defaults | Description |
 |---|---|---|
-| `/vio/odom` (`odom_topic`) | `nav_msgs/Odometry` | `output_rate_hz` 고정 (기본 10 Hz) |
-| `/vio/pose` (`pose_topic`) | `geometry_msgs/PoseWithCovarianceStamped` | 필터 갱신마다 (기준 데이터에서 약 7 Hz) |
-| `/vio/path` (`path_topic`) | `nav_msgs/Path` | 갱신마다 |
-| `/vio/divergence` (`divergence_topic`) | `std_msgs/Bool` | odom과 같은 주기 |
-
-`/vio/odom`은 마지막 필터 갱신 위치에서 IMU로 전파한 값이라, 갱신 주기와 무관하게 일정한 주기로 나온다.
-`/vio/path`는 매번 배열 전체를 다시 보낸다. 기본값 5000은 7 Hz 갱신 기준 약 12분치이고 AMtown03(4441개) 전 구간이 들어간다.
-RViz에서 궤적 앞부분이 잘려 보이면 이 값이 모자란 것이다 — `path_max_poses:=0`이면 무제한이다.
-대신 길수록 발행 대역이 커지므로(5000개면 한 번에 약 280 KB) Jetson에서는 줄이거나 `/vio/path`를 구독하지 않는 편이 낫다.
-
-**좌표계.** `frame_id`(기본 `odom`)는 필터 원점 기준 좌표계다. z가 위, 중력이 −z이고 yaw는 임의다.
-드리프트하는 월드 고정 프레임이므로 REP-105의 `odom`에 해당한다.
-`body_frame_id`(기본 `imu`)는 Odometry의 `child_frame_id`다. **추정 대상이 IMU 프레임이라 `base_link`가 아니다.**
-`base_link` 자세가 필요하면 받는 쪽에서 자기 URDF의 `base_link`→`imu` static transform을 적용한다.
-이 노드는 TF를 publish하지 않는다.
-
-**나머지 파라미터**
-
-| | 기본값 | |
-|---|---|---|
+| `frame_id` | `odom` | filter origin 기준. z-up, gravity −z, yaw arbitrary |
+| `body_frame_id` | `imu` | Odometry `child_frame_id`. `base_link` 아님 |
 | `output_rate_hz` | 10.0 | odom·divergence 발행 주기 |
 | `divergence_timeout_s` | 2.0 | 이 시간 동안 갱신이 없으면 divergence |
-| `divergence_pos_std_m` | 100.0 | 위치 표준편차가 이를 넘으면 divergence |
+| `divergence_pos_std_m` | 100.0 | position std가 넘으면 divergence |
 | `path_max_poses` | 5000 | Path에 담는 최근 pose 개수. `0`이면 무제한 |
-| `image_queue_max` | 30 | 처리 대기 프레임 상한. 넘으면 오래된 것부터 버린다 |
-| `imu_hold_max_s` | 1.0 | 카메라가 이만큼 조용하면 프레임 없이 IMU를 필터에 넘긴다 |
-| `out_csv` | (없음) | 주면 갱신마다 CSV 한 행. `run_feeder` 출력과 같은 형식 |
+| `image_queue_max` | 30 | 초과 시 오래된 frame부터 drop |
+| `imu_hold_max_s` | 1.0 | 카메라가 이만큼 조용하면 frame 없이 IMU를 filter로 |
+| `out_csv` | — | update마다 CSV 한 행, `run_feeder`와 같은 형식 |
 
-`divergence`는 위 두 임계값을 넘거나 상태가 유한하지 않을 때 true다. 판정 규칙은 아직 임시다("상태" 참조).
-
-**동작.** 구독 콜백은 큐에 넣기만 하고 스레드 하나가 전부 처리한다. IMU는 도착 즉시 꺼내 고정 주기 출력에 쓰지만,
-필터와 게이트에는 프레임이 시간 경계를 지어 줄 때 넘긴다. 스탬프 t의 프레임은 t 이후 스탬프의 IMU를 본 뒤에
-처리되고(IMU는 자기 토픽에서 순서대로 오므로 t 이전 IMU가 남아 있지 않다는 증거다), 그때 t까지의 IMU를 전부 넣고
-프레임을 넣는다. 그래서 도착 지연과 무관하게 필터는 항상 시간순으로 측정을 받고, 같은 bag을 재생하면
-`run_feeder`와 같은 추정이 나온다. 무거운 연산(KLT, 특징점 검출)은 OpenCV가 `opencv_threads`만큼 병렬로 돈다.
-
-영상 크기가 설정의 `resolution`과 다르거나 지원하지 않는 encoding이면 그 프레임을 버리고 로그를 남긴다.
-엔진이 측정을 거부하면(상태보다 오래된 프레임, propagation 실패) 갱신으로 세지 않는다.
-종료할 때 처리량과 `dropped_images`·`rejected_updates`를 로그로 남긴다.
+TF는 publish 안 한다. `base_link` pose가 필요하면 수신 측에서 `base_link`→`imu` static transform.
+</details>
 
 ## 오프라인 러너
 
@@ -243,19 +203,8 @@ ros2 run vio_node run_feeder AMtown03
 우리가 새로 쓴 것: keyframe 게이트 front-end(`gated_frontend.cpp`), 파이프라인(`pipeline.cpp`), 오프라인 러너(`run_feeder.cpp`),
 ROS2 노드(`vio_node.cpp`), 10 Hz 전파 출력, divergence 플래그.
 
-## 라이선스
-
-엔진은 MSCEqF(Apache-2.0)를 기반으로 하며 위와 같이 수정했다. 라이선스 전문은 [`LICENSE`](LICENSE).
-빌드할 때 받아오는 Lie++(Apache-2.0), yaml-cpp(MIT), Eigen(MPL-2.0)은 이 저장소에 포함하지 않는다.
-나머지 코드는 이 패키지의 것이다.
-
-## 상태
-
-구현하지 않은 것:
-
-- **정확도 점수(m) 출력.** pose·odom의 공분산은 필터 내부 값을 ROS 관례로 회전해 내보내지만 보정하지 않았다.
-  실제 오차를 반영하는 값이 아니다.
-- **WGS84/NED 변환.** 지금은 필터 원점 기준 좌표만 낸다.
-- **TF publish.**
+## Future Work
+- **Confidence Scrore**
+- **WGS84/NED transfer** 현재 필터 원점 기준 좌표만 낸다.
+- **TF publish**
 - `divergence` 판정은 위의 단순 규칙이다.
-- Jetson 실측(출력 주기, CPU·GPU 점유, 지연)은 아직 없다.
