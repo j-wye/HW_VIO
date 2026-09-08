@@ -9,7 +9,7 @@ extrinsics_std: [1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1, 1.0e-1]   # physical pr
 intrinsics_std:    [1.0, 1.0, 1.0, 1.0]
 
 # ---- IMU noise (Livox Avia built-in BMI088, /imu/data)
-accelerometer_noise_density: 3.300e-03
+accelerometer_noise_density: 1.0e-2
 accelerometer_random_walk:   2.000e-03
 gyroscope_noise_density:     2.400e-04
 gyroscope_random_walk:       2.000e-05
@@ -52,7 +52,7 @@ feature_refinement_tollerance: 1e-10
 measurement_projection_method: unit_plane
 feature_representation: anchored_inverse_depth
 pixel_standerd_deviation: 4.0    # sic (MSCEqF key name)
-curvature_correction: true
+curvature_correction: false
 min_track_length: 4
 min_angle_deg: 2.0
 zero_velocity_update: enabled
