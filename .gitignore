@@ -17,3 +17,6 @@ __pycache__/
 .vscode/
 *.swp
 .DS_Store
+
+# "#"로 시작하는 폴더는 올리지 않는다
+\#*/
