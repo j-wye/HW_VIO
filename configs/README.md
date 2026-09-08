@@ -7,9 +7,7 @@
 | ✅ | [`AMtown03`](AMtown03/) | AMtown | -0.067 | 620 s, cruise **11.9 m/s** |
 | ✅ | [`AMvalley03`](AMvalley03/) | AMvalley | -0.066 | 546 s, cruise **12.0 m/s** |
 | ✅ | [`HKisland03`](HKisland03/) | HKisland | -0.092 | 380 s, cruise **9.0 m/s** |
-| ⛔ | [`HKairport03`](HKairport03/) | HKairport | -0.09 | 366 s, cruise **8.6 m/s** |
 | ✅ | [`HKisland_GNSS03`](HKisland_GNSS03/) | HK_GNSS | -0.092 | 391 s, cruise **9.0 m/s** |
-| ⛔ | [`HKairport_GNSS03`](HKairport_GNSS03/) | HK_GNSS | -0.089 | 397 s, cruise 7.1 m/s |
 
 각 폴더에 `config.yaml` 하나와 `README.md`. 시퀀스마다 config는 하나만 둔다 — 탐색 중 생기는 변형은 다른 이름으로 만들고,
 끝나면 이긴 것을 `config.yaml`로 남기고 나머지는 지운다. calib에서 유도한 초기 config는 작업 저장소의 생성기가
@@ -35,7 +33,6 @@
 | AMvalley03 | `curvature_correction` | false | |
 | HKisland03 | `num_clones` | 13 | 9 m/s라 주입률이 낮아 창이 짧다. AMtown03에 이식하면 붕괴(361 m) |
 | HKisland_GNSS03 | `num_clones` / `optical_flow_pyramid_levels` | 13 / 4 | |
-| HKairport03 | `optical_flow_win_size` | 15 | 활주로·계류장이 저텍스처. 이 시퀀스 전용 |
 
 성능은 **시작 0 단일 실행 전 구간**으로 보고하고, 통계는 그 실행 안의 60 s 창 분포로 낸다.
 ⚠️ `--delta-px`(시차 주입 임계값, px)는 `timeshift_cam_imu`(초, τ)와 다른 양이다.
