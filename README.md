@@ -40,11 +40,16 @@ git clone https://github.com/j-wye/HW_VIO.git ~/hanwha/src/vio_node
 ```bash
 cd ~/hanwha/src
 gdown 1WpPCvj6n-_g99b8_OwjQYuYs4JMf-vKi -O datasets.zip
+test -s datasets.zip || { echo "다운로드 실패"; exit 1; }
 unzip -q datasets.zip && rm datasets.zip
 touch datasets/COLCON_IGNORE
 ```
 
 `COLCON_IGNORE`는 colcon이 21 GB짜리 데이터셋 트리를 매번 훑지 않게 한다.
+
+용량이 커서 gdown이 빈 파일만 남기고 끝나는 경우가 있다 — 위의 `test -s`가 그때 멈춘다.
+그러면 다시 실행하거나(이어받지는 않는다), 브라우저로 직접 받아 `~/hanwha/src/datasets.zip`에 두고
+`unzip`부터 이어서 한다.
 
 **3. 의존성과 빌드**
 
