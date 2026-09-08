@@ -17,7 +17,10 @@ intrinsics_std:    [1.0, 1.0, 1.0, 1.0]
 accelerometer_noise_density: 1.2014723e-02
 accelerometer_random_walk:   2.0829747e-04
 gyroscope_noise_density:     9.2653692e-03
-gyroscope_random_walk:       9.5533980e-05
+gyroscope_random_walk:       1.7e-03    # Kalibr 실측 9.55e-5의 18배. 정지 상태에서 잰 값이라
+                                        # 비행 중 진동을 반영 못 한다: 실측 bias가 60초에 0.18->0.94 deg/s로
+                                        # 움직이는데 9.55e-5가 허용하는 폭은 0.042 deg/s뿐이다.
+                                        # 18배가 실측 변화폭에서 역산한 값이자 실제 최적점 (240s APE 45k->24k).
 
 # ---- camera (Kalibr convention)
 distortion_model: radtan

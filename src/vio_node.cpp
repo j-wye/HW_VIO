@@ -56,7 +56,7 @@ class VioNode : public rclcpp::Node
   {
     const std::string config = declare_parameter<std::string>("config_filepath", "");
     const std::string imu_topic = declare_parameter<std::string>("imu_topic", "");
-    const std::string cam_topic = declare_parameter<std::string>("cam_topic", "");
+    const std::string image_topic = declare_parameter<std::string>("image_topic", "");
     const std::string odom_topic = declare_parameter<std::string>("odom_topic", "/vio/odom");
     const std::string pose_topic = declare_parameter<std::string>("pose_topic", "/vio/pose");
     const std::string path_topic = declare_parameter<std::string>("path_topic", "/vio/path");
@@ -80,7 +80,7 @@ class VioNode : public rclcpp::Node
 
     if (config.empty()) throw std::runtime_error("parameter config_filepath is required");
     if (imu_topic.empty()) throw std::runtime_error("parameter imu_topic is required");
-    if (cam_topic.empty()) throw std::runtime_error("parameter cam_topic is required");
+    if (image_topic.empty()) throw std::runtime_error("parameter image_topic is required");
     if (out_hz <= 0.0) throw std::runtime_error("output_rate_hz must be > 0");
     period_ = 1.0 / out_hz;
 
@@ -118,7 +118,7 @@ class VioNode : public rclcpp::Node
     sub_imu_ = create_subscription<sensor_msgs::msg::Imu>(
         imu_topic, imu_qos, [this](sensor_msgs::msg::Imu::SharedPtr m) { onImu(*m); });
     sub_cam_ = create_subscription<sensor_msgs::msg::Image>(
-        cam_topic, cam_qos, [this](sensor_msgs::msg::Image::SharedPtr m) { onImage(*m); });
+        image_topic, cam_qos, [this](sensor_msgs::msg::Image::SharedPtr m) { onImage(*m); });
 
     // the odometry path runs on IMU arrival, so a silent IMU would also silence divergence
     watchdog_ = create_wall_timer(std::chrono::duration<double>(div_timeout_ / 2.0), [this] { watchdog(); });

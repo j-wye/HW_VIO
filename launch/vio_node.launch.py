@@ -1,24 +1,22 @@
-# config_filepath defaults to the AMtown03 config shipped with the package.
+# dataset:=<name> picks configs/<name>/config.yaml out of the installed package.
+# Pass config_filepath:= instead to point somewhere else.
 
-import os
-
-from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
+from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    default_config = os.path.join(
-        get_package_share_directory("vio_node"), "configs", "AMtown03", "config.yaml"
+    default_config = PathJoinSubstitution(
+        [FindPackageShare("vio_node"), "configs", LaunchConfiguration("dataset"), "config.yaml"]
     )
 
     params = {
-        "config_filepath": (default_config, None),
         "imu_topic": ("/imu/data", None),
-        "cam_topic": ("/camera/image_raw", None),
+        "image_topic": ("/camera/image_raw", None),
         "odom_topic": ("/vio/odom", None),
         "pose_topic": ("/vio/pose", None),
         "path_topic": ("/vio/path", None),
@@ -35,12 +33,13 @@ def generate_launch_description():
         "use_sim_time": ("false", bool),
     }
 
-    args = [DeclareLaunchArgument(k, default_value=v) for k, (v, _) in params.items()]
-    args.append(
-        DeclareLaunchArgument(
-            "qos_profile", default_value="reliable", choices=["reliable", "best_effort"]
-        )
-    )
+    args = [
+        DeclareLaunchArgument("dataset", default_value="AMtown03"),
+        DeclareLaunchArgument("config_filepath", default_value=default_config),
+        DeclareLaunchArgument("qos_profile", default_value="reliable",
+                              choices=["reliable", "best_effort"]),
+    ]
+    args += [DeclareLaunchArgument(k, default_value=v) for k, (v, _) in params.items()]
 
     # numeric parameters must carry their type: `output_rate_hz:=10` would otherwise
     # reach the node as an int and be rejected
@@ -48,6 +47,7 @@ def generate_launch_description():
         k: (LaunchConfiguration(k) if t is None else ParameterValue(LaunchConfiguration(k), value_type=t))
         for k, (_, t) in params.items()
     }
+    values["config_filepath"] = LaunchConfiguration("config_filepath")
     values["qos_profile"] = LaunchConfiguration("qos_profile")
 
     node = Node(

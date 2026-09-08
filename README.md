@@ -65,18 +65,21 @@ then project structure follows:
 
 ## Execution
 ```bash
-ros2 launch vio_node vio_node.launch.py
-ros2 launch vio_node vio_node.launch.py config_filepath:=/path/config.yaml cam_topic:=/cam0 qos_profile:=best_effort
+ros2 launch vio_node vio_node.launch.py dataset:=AMtown03
+ros2 launch vio_node vio_node.launch.py dataset:=HKisland03 image_topic:=/cam0 qos_profile:=best_effort
 ```
+
+`dataset:=<이름>`이 `configs/<이름>/config.yaml`을 잡는다. 다른 곳의 config를 쓰려면 `config_filepath:=`로 직접 준다.
 <details>
 <summary> I/O & Params</summary>
 
 **Input**
 | Parameter | Default | Description |
 |---|---|---|
-| `config_filepath` | `configs/AMtown03/config.yaml` | config.yaml |
+| `dataset` | `AMtown03` | `configs/<이름>/config.yaml`을 고른다 |
+| `config_filepath` | `dataset`에서 유도 | 직접 주면 `dataset`보다 우선 |
 | `imu_topic` | `/imu/data` | `sensor_msgs/Imu`. $\mathbf{a}$ (m/s²), $\boldsymbol{\omega}$ (rad/s) |
-| `cam_topic` | `/camera/image_raw` | `sensor_msgs/Image`. mono8 / bgr8 / rgb8 / bgra8 / rgba8 |
+| `image_topic` | `/camera/image_raw` | `sensor_msgs/Image`. mono8 / bgr8 / rgb8 / bgra8 / rgba8 |
 | `qos_profile` | `reliable` | `reliable` \| `best_effort` publisher와 match (bag = `reliable`, 실기체 드라이버 = `best_effort`) |
 
 **Output**
@@ -102,54 +105,30 @@ ros2 launch vio_node vio_node.launch.py config_filepath:=/path/config.yaml cam_t
 TF는 publish 안 한다. `base_link` pose가 필요하면 수신 측에서 `base_link`→`imu` static transform.
 </details>
 
-## 오프라인 러너
+## Offline Runner
 
-rosbag2를 시간순으로 직접 읽어 한 스레드에서 돌린다. ROS를 거치지 않으므로 재생 속도에 따른 메시지 유실이 없고,
-같은 입력이면 항상 같은 CSV가 나온다. **정확도 작업은 이쪽으로 한다.**
-
-노드가 아니라 그냥 실행파일이라(`--ros-args`를 받지 않는다) `ros2 run`으로 띄운다.
-**시퀀스 이름만 주면 나머지 경로는 규칙으로 정해진다.**
+rosbag을 시간순으로 직접 읽어 한 스레드에서 돌린다. ROS를 거치지 않으므로 재생 속도에 따른 메시지 유실이 없고,
+같은 입력이면 항상 같은 CSV가 나온다. **정확도 작업은 이걸로 진행**
 
 ```bash
 ros2 run vio_node run_feeder AMtown03
 ```
 
-| | 규칙 |
+| | Rule |
 |---|---|
-| bag | `datasets/<시퀀스>` 또는 `~/hanwha/src/datasets/<시퀀스>` 중 먼저 있는 쪽. 다른 곳에 두었으면 `VIO_DATASETS`로 지정 |
-| config | 설치된 패키지의 `configs/<시퀀스>/config.yaml` |
-| 출력 | 현재 디렉터리의 `<시퀀스>.csv` |
+| bag | `~/hanwha/src/datasets/$DATASET` |
+| config | 설치된 패키지의 `configs/$DATASET/config.yaml` |
+| 출력 | 현재 디렉터리의 `$DATASET.csv` |
 
-그래서 데이터셋 폴더 이름과 `configs/` 아래 폴더 이름을 **같게 맞춰 두면** 새 시퀀스를 추가해도 명령이 그대로다.
-시작할 때 실제로 어떤 경로를 골랐는지 stderr에 찍는다.
+**반드시 데이터셋 폴더 이름과 `configs/` 아래 폴더 이름을 같게 매칭**
 
-경로를 직접 주려면 세 개를 전부 준다.
-
-```bash
-ros2 run vio_node run_feeder <bag_dir> <config.yaml> <out.csv>
-```
-
-`vio_node`가 쓰는 front-end와 **같은 코드**(`gated_frontend.cpp`)를 쓴다. 그래서 이 CSV와 노드의 `out_csv`가
-같으면 노드 경로가 정상이라는 뜻이다.
-
-**keyframe 게이트가 하는 일**
-
-1. 매 프레임 특징점을 추적한다 (엔진의 `Tracker`를 그대로 쓴다).
-2. 각 특징점은 **자기 참조 프레임 대비 시차**를 누적한다. IMU 회전분을 빼서, 기체가 제자리에서 회전만 해도
-   시차가 쌓이지 않게 한다 — 회전은 삼각측량에 도움이 안 되기 때문이다.
+**Keyframe Gate가 하는 일**
+1. 매 프레임 Feature Tracking
+2. 각 특징점은 **자기 참조 프레임 대비 시차**를 누적
 3. 시차가 `delta_px`를 넘은 특징점 비율이 `fire_frac` 이상이면 그 프레임을 필터에 넣는다.
 4. 넣을 때 **준비된 특징점만** 넣고, 그것들만 참조를 새로 잡는다. 나머지는 계속 누적한다.
 
-프레임은 10 Hz로 들어와도 필터 갱신은 약 7 Hz다(AMtown03 기준 6199프레임 → 4443회 주입).
-기체가 거의 안 움직인 사이의 두 프레임을 넣으면 삼각측량 기선이 짧아 depth가 크게 틀리는데, 게이트가 그걸 막는다.
-
-임계값은 `config.yaml`의 `frontend:` 블록에 있고, 전 시퀀스가 같은 값을 쓴다.
-
-`run_feeder` 옵션: `--delta-px --fire-frac --min-inject --min-ref --max-dt`(설정 파일 값을 덮어쓴다),
-`--start S --duration D`, `--disp-log PATH`, `--track-log PATH`. 모르는 옵션은 거부한다.
-
-bag의 토픽 이름은 `/camera/image_raw`, `/imu/data`로 고정돼 있다. 러너는 bag의 기록 순서대로 읽으므로,
-노드와 같은 결과가 나오려면 bag이 header stamp 순서로 정렬돼 있어야 한다.
+- 기체가 거의 안 움직인 사이의 두 프레임을 넣으면 Triangulation 을 진행할 parallax가 짧아 depth error 폭증을 막음
 
 ## 설정
 
