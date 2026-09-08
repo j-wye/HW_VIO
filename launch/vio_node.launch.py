@@ -1,5 +1,5 @@
 # dataset:=<name> picks configs/<name>/config.yaml out of the installed package.
-# Pass config_filepath:= instead to point somewhere else.
+# That is the only way in: every run uses a config that ships with the package.
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
@@ -10,7 +10,7 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    default_config = PathJoinSubstitution(
+    config = PathJoinSubstitution(
         [FindPackageShare("vio_node"), "configs", LaunchConfiguration("dataset"), "config.yaml"]
     )
 
@@ -35,7 +35,6 @@ def generate_launch_description():
 
     args = [
         DeclareLaunchArgument("dataset", default_value="AMtown03"),
-        DeclareLaunchArgument("config_filepath", default_value=default_config),
         DeclareLaunchArgument("qos_profile", default_value="reliable",
                               choices=["reliable", "best_effort"]),
     ]
@@ -47,7 +46,7 @@ def generate_launch_description():
         k: (LaunchConfiguration(k) if t is None else ParameterValue(LaunchConfiguration(k), value_type=t))
         for k, (_, t) in params.items()
     }
-    values["config_filepath"] = LaunchConfiguration("config_filepath")
+    values["config_filepath"] = config
     values["qos_profile"] = LaunchConfiguration("qos_profile")
 
     node = Node(

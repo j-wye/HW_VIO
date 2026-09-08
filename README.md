@@ -69,7 +69,7 @@ ros2 launch vio_node vio_node.launch.py dataset:=AMtown03
 ros2 launch vio_node vio_node.launch.py dataset:=HKisland03 image_topic:=/cam0 qos_profile:=best_effort
 ```
 
-`dataset:=<이름>`이 `configs/<이름>/config.yaml`을 잡는다. 다른 곳의 config를 쓰려면 `config_filepath:=`로 직접 준다.
+`dataset:=<이름>`이 `configs/<이름>/config.yaml`을 잡는다. config 경로를 직접 주는 방법은 없다 — 새 시퀀스는 `configs/` 아래에 폴더를 만들어 넣는다.
 <details>
 <summary> I/O & Params</summary>
 
@@ -77,7 +77,6 @@ ros2 launch vio_node vio_node.launch.py dataset:=HKisland03 image_topic:=/cam0 q
 | Parameter | Default | Description |
 |---|---|---|
 | `dataset` | `AMtown03` | `configs/<이름>/config.yaml`을 고른다 |
-| `config_filepath` | `dataset`에서 유도 | 직접 주면 `dataset`보다 우선 |
 | `imu_topic` | `/imu/data` | `sensor_msgs/Imu`. $\mathbf{a}$ (m/s²), $\boldsymbol{\omega}$ (rad/s) |
 | `image_topic` | `/camera/image_raw` | `sensor_msgs/Image`. mono8 / bgr8 / rgb8 / bgra8 / rgba8 |
 | `qos_profile` | `reliable` | `reliable` \| `best_effort` publisher와 match (bag = `reliable`, 실기체 드라이버 = `best_effort`) |
