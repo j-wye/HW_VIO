@@ -36,8 +36,7 @@ git clone https://github.com/j-wye/HW_VIO.git ~/hanwha/src/vio_node
 
 **2. 데이터셋** (MARS-LVIG 시퀀스의 rosbag2 변환본, 시퀀스당 4~6 GB)
 
-아래 네 개를 브라우저로 눌러 `~/Downloads`에 받는다. 파일명이 곧 시퀀스 이름이다
-(`AMtown03.tar.gz`, `AMvalley03.tar.gz`, `HKisland03.tar.gz`, `HKisland_GNSS03.tar.gz`).
+아래 네 개를 `~/Downloads`에 받는다.
 
 - https://drive.google.com/file/d/1p1vz40NBtruBvdrEWW66WqU1A9vXY9A_/view?usp=drive_link
 - https://drive.google.com/file/d/14CVP-OpuUyURa9ks-Dhs0S61OjfhUfNx/view?usp=drive_link
@@ -46,13 +45,15 @@ git clone https://github.com/j-wye/HW_VIO.git ~/hanwha/src/vio_node
 
 ```bash
 mkdir -p ~/hanwha/src/datasets
-cd ~/hanwha/src/datasets
-for s in AMtown03 AMvalley03 HKisland03 HKisland_GNSS03; do tar xzf ~/Downloads/$s.tar.gz; done
-touch COLCON_IGNORE
+cd ~/Downloads
+tar -zxvf AMtown03.tar.gz        -C ~/hanwha/src/datasets
+tar -zxvf AMvalley03.tar.gz      -C ~/hanwha/src/datasets
+tar -zxvf HKisland03.tar.gz      -C ~/hanwha/src/datasets
+tar -zxvf HKisland_GNSS03.tar.gz -C ~/hanwha/src/datasets
+touch ~/hanwha/src/datasets/COLCON_IGNORE
 ```
 
-`COLCON_IGNORE`는 colcon이 21 GB짜리 데이터셋 트리를 매번 훑지 않게 한다.
-다 풀렸으면 `~/Downloads`의 `.tar.gz`는 지워도 된다.
+`COLCON_IGNORE`가 있어야 colcon이 21 GB짜리 데이터셋 트리를 훑지 않는다.
 
 **3. 의존성과 빌드**
 
