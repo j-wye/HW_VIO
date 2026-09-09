@@ -133,14 +133,8 @@ ros2 run vio_node run_feeder AMtown03
 4. 넣을 때 **준비된 특징점만** 넣고, 그것들만 참조를 새로 잡는다. 나머지는 계속 누적한다.
 
 - 기체가 거의 안 움직인 사이의 두 프레임을 넣으면 Triangulation 을 진행할 parallax가 짧아 depth error 폭증을 막음
-</details>
 
-## New Dataset Setting
-Sequence마다 `configs/$DATASET/config.yaml` 하나에 파라미터(intrinsics, `T_cam_imu`, IMU 노이즈, `num_clones` 등)와 frontend gate 값이 함께 들어 있다. 새 카메라·IMU·새 기체·새 데이터셋을 쓰려면 이 파일의 calib 값을 바꾼다.
-
-<details>
-<summary>config file</summary>
-
+`config.yaml`의 `frontend:` 블록:
 ```yaml
 frontend:          # keyframe 게이트
   delta_px: 4.0    # Feature 별 parallax threshold (px)
@@ -165,10 +159,11 @@ frontend:          # keyframe 게이트
 | 빌드 | ROS1·native·예제·테스트 경로 제거, Lie++·yaml-cpp 커밋 고정 | |
 </details>
 
-<details>
-<summary>Future Work</summary>
+### New Dataset Setting
+Sequence마다 `configs/$DATASET/config.yaml` 하나에 파라미터(intrinsics, `T_cam_imu`, IMU 노이즈, `num_clones` 등)와 frontend gate 값이 함께 들어 있다. 새 카메라·IMU·새 기체·새 데이터셋을 쓰려면 이 파일의 calib 값을 바꾼다.
+
+### Future Work
 
 - **Confidence Scrore**
 - **WGS84/NED transfer** 현재 필터 원점 기준 좌표만 낸다.
 - **TF publish**
-</details>
