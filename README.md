@@ -162,7 +162,7 @@ frontend:          # keyframe 게이트
 ### New Dataset Setting
 Sequence마다 `configs/$DATASET/config.yaml` 하나에 파라미터(intrinsics, `T_cam_imu`, IMU 노이즈, `num_clones` 등)와 frontend gate 값이 함께 들어 있다. 새 카메라·IMU·새 기체·새 데이터셋을 쓰려면 이 파일의 calib 값을 바꾼다.
 
-### Future Work
+## Future Work
 
 - **Confidence Scrore**
 - **WGS84/NED transfer** 현재 필터 원점 기준 좌표만 낸다.
