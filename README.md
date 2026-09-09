@@ -97,12 +97,14 @@ ros2 launch vio_node vio_node.launch.py config_filepath:=/path/config.yaml cam_t
 | `path_max_poses` | 5000 | Path에 담는 최근 pose 개수. `0`이면 무제한 |
 | `image_queue_max` | 30 | 초과 시 오래된 frame부터 drop |
 | `imu_hold_max_s` | 1.0 | 카메라가 이만큼 조용하면 frame 없이 IMU를 filter로 |
+| `divergence_timeout_s` | 2.0 | 이 시간 동안 update가 없으면 divergence |
+| `divergence_pos_std_m` | 100.0 | position std가 이 값을 넘으면 divergence |
 | `out_csv` | — | update마다 CSV 한 행, `run_feeder`와 같은 형식 |
 
 TF는 publish 안 한다. `base_link` pose가 필요하면 수신 측에서 `base_link`→`imu` static transform.
 </details>
 
-## Offline Runner
+### Offline Runner
 
 rosbag을 시간순으로 직접 읽어 한 스레드에서 돌린다. ROS를 거치지 않으므로 재생 속도에 따른 메시지 유실이 없고,
 같은 입력이면 항상 같은 CSV가 나온다. **정확도 작업은 이걸로 진행**
@@ -111,16 +113,18 @@ rosbag을 시간순으로 직접 읽어 한 스레드에서 돌린다. ROS를 �
 ros2 run vio_node run_feeder AMtown03
 ```
 
+## Rule
+
 <details>
-<summary>Rule</summary>
+<summary>Workspace Structure</summary>
+
+**반드시 데이터셋 폴더 이름과 `configs/` 아래 폴더 이름을 같게 매칭**
 
 | | Rule |
 |---|---|
 | bag | `~/hanwha/src/datasets/$DATASET` |
 | config | 설치된 패키지의 `configs/$DATASET/config.yaml` |
 | 출력 | 현재 디렉터리의 `$DATASET.csv` |
-
-**반드시 데이터셋 폴더 이름과 `configs/` 아래 폴더 이름을 같게 매칭**
 
 **Keyframe Gate가 하는 일**
 1. 매 프레임 Feature Tracking
@@ -147,17 +151,8 @@ frontend:          # keyframe 게이트
 ```
 </details>
 
-## Test
-
-```bash
-ros2 run vio_node run_feeder AMtown03
-```
-
-`AMtown03.csv`가 생기고 stderr에 처리량 한 줄이 출력
 <details>
-<summary></summary>
-
-## MSCEqF에서 바뀐 것
+<summary>MSCEqF에서 바뀐 것</summary>
 
 엔진(`src/engine/`, `include/`)은 MSCEqF 원본을 다음과 같이 수정한 것이다. 수정한 파일에는 그 사실을 적어 두었다.
 
@@ -170,7 +165,10 @@ ros2 run vio_node run_feeder AMtown03
 | 빌드 | ROS1·native·예제·테스트 경로 제거, Lie++·yaml-cpp 커밋 고정 | |
 </details>
 
-## Future Work
+<details>
+<summary>Future Work</summary>
+
 - **Confidence Scrore**
 - **WGS84/NED transfer** 현재 필터 원점 기준 좌표만 낸다.
 - **TF publish**
+</details>

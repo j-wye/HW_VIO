@@ -2,7 +2,7 @@
 <package format="3">
   <name>vio_node</name>
   <version>0.1.0</version>
-  <description>Monocular VIO node on the MSCEqF engine, with deterministic offline runners</description>
+  <description>Monocular VIO node on the MSCEqF engine, with a deterministic offline runner</description>
 
   <maintainer email="qkrwhddbs26@gmail.com">hanwha-vio</maintainer>
   <license>Apache-2.0</license>
@@ -20,7 +20,7 @@
   <depend>libopencv-dev</depend>
   <depend>boost</depend>
 
-  <!-- rosbag2 sqlite3 storage plugin: run_offline/run_feeder가 bag을 열 때 런타임에 필요 -->
+  <!-- rosbag2 sqlite3 storage plugin: run_feeder가 bag을 열 때 런타임에 필요 -->
   <exec_depend>rosbag2_storage_default_plugins</exec_depend>
   <exec_depend>ros2launch</exec_depend>
 

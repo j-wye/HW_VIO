@@ -10,8 +10,7 @@
 | ✅ | [`HKisland_GNSS03`](HKisland_GNSS03/) | HK_GNSS | -0.092 | 391 s, cruise **9.0 m/s** |
 
 각 폴더에 `config.yaml` 하나와 `README.md`. 시퀀스마다 config는 하나만 둔다 — 탐색 중 생기는 변형은 다른 이름으로 만들고,
-끝나면 이긴 것을 `config.yaml`로 남기고 나머지는 지운다. calib에서 유도한 초기 config는 작업 저장소의 생성기가
-`config.yaml`이 없을 때만 만들어 준다.
+끝나면 이긴 것을 `config.yaml`로 남기고 나머지는 지운다.
 
 ## 변수 정의 — `AMtown03/config.yaml`
 
@@ -28,11 +27,12 @@
 
 고정 세트가 기본값이고, 시퀀스별 예외는 근거를 config 헤더에 남길 때만 둔다. 현재 예외:
 
-| 시퀀스 | 키 | 값 | 이유 |
+| 시퀀스 | 키 | 값 | 이유 (고정값으로 되돌렸을 때 SE3) |
 |---|---|---|---|
-| AMvalley03 | `curvature_correction` | false | |
+| AMvalley03 | `curvature_correction` | false | 18.88 → 19.79 m |
 | HKisland03 | `num_clones` | 13 | 9 m/s라 주입률이 낮아 창이 짧다. AMtown03에 이식하면 붕괴(361 m) |
-| HKisland_GNSS03 | `num_clones` / `optical_flow_pyramid_levels` | 13 / 4 | |
+| HKisland_GNSS03 | `curvature_correction` | false | 10.64 → 27.89 m |
+| HKisland_GNSS03 | `accelerometer_noise_density` | 1.0e-2 | 진동이 HKisland03보다 24-43 % 강하다. 10.64 → 22.43 m |
 
 성능은 **시작 0 단일 실행 전 구간**으로 보고하고, 통계는 그 실행 안의 60 s 창 분포로 낸다.
 ⚠️ `--delta-px`(시차 주입 임계값, px)는 `timeshift_cam_imu`(초, τ)와 다른 양이다.

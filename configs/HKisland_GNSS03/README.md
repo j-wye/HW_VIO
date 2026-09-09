@@ -17,8 +17,16 @@ In the evaluation set since 2026-09-06 (the hardest of the four: airframe vibrat
 
 ## 설정
 
-고정 변수 세트를 그대로 쓴다 (`configs/README.md`). 바꾼 값 없음.
+고정 변수 세트(`configs/README.md`)에서 두 값을 바꿨다. HKisland03과 같은 카메라·IMU를 쓰지만 기체 진동이
+24-43 % 강해, 가속도계를 덜 믿는 쪽이 맞다.
 
-이 파일로 측정한 값: SE3 12.91 m, 60 s 윈도우 4.57 / 8.86 / 10.50 m, 1 s drift 0.851 m, 주입 5.97 Hz.
+| 키 | 이 시퀀스 | 고정 세트 | 고정 세트로 되돌리면 |
+|---|---|---|---|
+| `accelerometer_noise_density` | `1.0e-2` | `3.3e-3` | 22.43 m |
+| `curvature_correction` | `false` | `true` | 27.89 m |
 
-clone 13개와 pyramid 4단계를 함께 쓰면 60 s 윈도우가 2.4 % 좋아지지만, pyramid 4는 단독으로 이 시퀀스에서 43 %(12.91 → 18.43 m), 다른 네 시퀀스에서 40~700 % 나빠진다. 그래서 고정 세트 그대로 둔다.
+이 파일로 측정한 값: SE3 **10.64 m**, 60 s window median 5.97 / p90 8.84 / max 11.89 m, 1 s drift 0.840 m,
+주입 5.97 Hz.
+
+`num_clones` 13 + `optical_flow_pyramid_levels` 4 조합은 60 s window를 4.26 m로 낮추지만 전 구간 SE3가
+14.25 m로 나빠져 채택하지 않았다.

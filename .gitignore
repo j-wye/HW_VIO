@@ -1,4 +1,12 @@
-# 이 저장소 = ROS2 패키지 vio_node (루트가 곧 패키지). ws 루트는 두 단계 위(~/ws)이고 거기서 colcon build.
+# 이 저장소 = ROS2 패키지 vio_node (루트가 곧 패키지). ws 루트는 두 단계 위이고 거기서 colcon build.
+
+# configs/ 아래는 평가 대상 4개만 올린다. 탐색용·비평가 시퀀스 config는 실수로도 커밋되지 않는다.
+configs/*
+!configs/README.md
+!configs/AMtown03/
+!configs/AMvalley03/
+!configs/HKisland03/
+!configs/HKisland_GNSS03/
 
 # 데이터·실행 출력은 저장소에 넣지 않는다
 *.bag
