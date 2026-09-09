@@ -22,7 +22,8 @@
 | 고정 | `extrinsics_std` | **0.1 × 6** (유도 extrinsic의 정직한 폭; m급 금지) |
 | 고정 | 게이트 값 (`run_feeder` 기본값 = 인자 없이 실행하면 곧 레시피) | `--delta-px 4 --fire-frac 0.1 --min-inject 4 --min-ref 0 --max-dt 0.5` (옛 `--gate/--mode/--trigger` 플래그는 2026-09-04 제거) |
 | 고정 | `accelerometer_random_walk` | 2e-3 |
-| 기체별 측정 | calib(`T_cam_imu`·intrinsics·distortion), `timeshift_cam_imu`, gyro/accel noise density(datasheet/Allan) | 측정 후 고정 |
+| 기체별 측정 | calib(`T_cam_imu`·intrinsics·distortion), `timeshift_cam_imu` | 측정 후 고정 |
+| 비행별 | `accelerometer_noise_density` | 센서 스펙이 아니라 그 비행의 진동이 가속도 채널에 섞이는 정도. 4개 시퀀스가 같은 IMU(Livox Avia 내장 BMI088)를 쓰지만 값이 갈린다 |
 | 배포 기하별 | `feature_max_depth`, 창 시간 상한 | 고도·시야각에 맞게 |
 
 고정 세트가 기본값이고, 시퀀스별 예외는 근거를 config 헤더에 남길 때만 둔다. 현재 예외:
@@ -32,7 +33,9 @@
 | AMvalley03 | `curvature_correction` | false | 18.88 → 19.79 m |
 | HKisland03 | `num_clones` | 13 | 9 m/s라 주입률이 낮아 창이 짧다. AMtown03에 이식하면 붕괴(361 m) |
 | HKisland_GNSS03 | `curvature_correction` | false | 10.64 → 27.89 m |
-| HKisland_GNSS03 | `accelerometer_noise_density` | 1.0e-2 | 진동이 HKisland03보다 24-43 % 강하다. 10.64 → 22.43 m |
+
+`accelerometer_noise_density`는 예외가 아니라 위의 비행별 값이다. HKisland_GNSS03만 `1.0e-2`(나머지 `3.3e-3`)인데,
+그 시퀀스는 정지 구간 `|acc|` std가 0.084 m/s²로 나머지(0.036~0.059)의 1.4~2.3배다. `3.3e-3`으로 되돌리면 10.64 → 22.43 m.
 
 성능은 **시작 0 단일 실행 전 구간**으로 보고하고, 통계는 그 실행 안의 60 s 창 분포로 낸다.
 ⚠️ `--delta-px`(시차 주입 임계값, px)는 `timeshift_cam_imu`(초, τ)와 다른 양이다.

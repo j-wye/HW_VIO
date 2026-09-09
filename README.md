@@ -86,6 +86,7 @@ ros2 launch vio_node vio_node.launch.py config_filepath:=/path/config.yaml cam_t
 | `/vio/odom` | `nav_msgs/Odometry` | `output_rate_hz` (10 Hz) | 마지막 filter update + IMU propagation |
 | `/vio/pose` | `geometry_msgs/PoseWithCovarianceStamped` | Filter Update | update 시점 값 그대로, propagation 없음 |
 | `/vio/path` | `nav_msgs/Path` | Filter Update | Accumulated path publish |
+| `/vio/divergence` | `std_msgs/Bool` | odom과 동일 | update 끊김·position std·NaN 기준의 임시 규칙 |
 
 **Parameters**
 
