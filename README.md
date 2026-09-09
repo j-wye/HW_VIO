@@ -65,20 +65,18 @@ then project structure follows:
 
 ## Execution
 ```bash
-ros2 launch vio_node vio_node.launch.py dataset:=AMtown03
-ros2 launch vio_node vio_node.launch.py dataset:=HKisland03 image_topic:=/cam0 qos_profile:=best_effort
+ros2 launch vio_node vio_node.launch.py
+ros2 launch vio_node vio_node.launch.py config_filepath:=/path/config.yaml cam_topic:=/cam0 qos_profile:=best_effort
 ```
-
-`dataset:=<이름>`이 `configs/<이름>/config.yaml`을 잡는다. config 경로를 직접 주는 방법은 없다 — 새 시퀀스는 `configs/` 아래에 폴더를 만들어 넣는다.
 <details>
 <summary> I/O & Params</summary>
 
 **Input**
 | Parameter | Default | Description |
 |---|---|---|
-| `dataset` | `AMtown03` | `configs/<이름>/config.yaml`을 고른다 |
+| `config_filepath` | `configs/AMtown03/config.yaml` | config.yaml |
 | `imu_topic` | `/imu/data` | `sensor_msgs/Imu`. $\mathbf{a}$ (m/s²), $\boldsymbol{\omega}$ (rad/s) |
-| `image_topic` | `/camera/image_raw` | `sensor_msgs/Image`. mono8 / bgr8 / rgb8 / bgra8 / rgba8 |
+| `cam_topic` | `/camera/image_raw` | `sensor_msgs/Image`. mono8 / bgr8 / rgb8 / bgra8 / rgba8 |
 | `qos_profile` | `reliable` | `reliable` \| `best_effort` publisher와 match (bag = `reliable`, 실기체 드라이버 = `best_effort`) |
 
 **Output**
@@ -113,6 +111,9 @@ rosbag을 시간순으로 직접 읽어 한 스레드에서 돌린다. ROS를 �
 ros2 run vio_node run_feeder AMtown03
 ```
 
+<details>
+<summary>Rule</summary>
+
 | | Rule |
 |---|---|
 | bag | `~/hanwha/src/datasets/$DATASET` |
@@ -128,37 +129,33 @@ ros2 run vio_node run_feeder AMtown03
 4. 넣을 때 **준비된 특징점만** 넣고, 그것들만 참조를 새로 잡는다. 나머지는 계속 누적한다.
 
 - 기체가 거의 안 움직인 사이의 두 프레임을 넣으면 Triangulation 을 진행할 parallax가 짧아 depth error 폭증을 막음
+</details>
 
-## 설정
+## New Dataset Setting
+Sequence마다 `configs/$DATASET/config.yaml` 하나에 파라미터(intrinsics, `T_cam_imu`, IMU 노이즈, `num_clones` 등)와 frontend gate 값이 함께 들어 있다. 새 카메라·IMU·새 기체·새 데이터셋을 쓰려면 이 파일의 calib 값을 바꾼다.
 
-시퀀스마다 `configs/<시퀀스>/config.yaml` 하나에 엔진 파라미터(intrinsics, `T_cam_imu`, IMU 노이즈, `num_clones` 등)와
-게이트 값이 함께 들어 있다. 새 카메라·IMU로 쓰려면 이 파일의 calib 값을 바꾼다.
+<details>
+<summary>config file</summary>
 
 ```yaml
-frontend:          # keyframe 게이트. 블록이 없으면 아래 값을 기본으로 쓰고 그 사실을 로그에 남긴다
-  delta_px: 4.0    # 특징점별 시차 임계값 (px)
-  fire_frac: 0.1   # 임계값을 넘은 특징점 비율이 이 이상이면 갱신
-  min_inject: 4    # 갱신에 필요한 최소 특징점 수
+frontend:          # keyframe 게이트
+  delta_px: 4.0    # Feature 별 parallax threshold (px)
+  fire_frac: 0.1   # Threshold를 넘은 feature ratio
+  min_inject: 4    # minimum feature num
   min_ref: 0       # 참조 특징점이 이보다 적은 프레임은 버린다 (N>0이면 강제 주입)
   max_dt: 0.5      # 이 시간 안에 갱신이 없으면 강제 주입 (IMU 버퍼 보호)
 ```
+</details>
 
-`frontend:` 안에 모르는 키가 있으면 에러다. 오타가 조용히 기본값으로 떨어지지 않게 하기 위한 것이다.
-`opencv_threads`는 1이면 결과가 비트 단위로 재현되고, 0이면 모든 코어를 쓴다(마지막 비트가 달라질 수 있다).
-
-## 동작 확인
-
-빌드가 끝났으면 한 번 돌려 본다. MARS-LVIG AMtown03 rosbag2가 필요하다.
+## Test
 
 ```bash
 ros2 run vio_node run_feeder AMtown03
 ```
 
-`AMtown03.csv`가 생기고 stderr에 처리량 한 줄이 찍히면 된다.
-
-노드 경로는 `out_csv`를 주고 같은 bag을 1배속으로 재생해 위 CSV와 비교하면 된다.
-`ros2 bag play`에는 `--delay 3`이 필요하다 — 없으면 discovery가 끝나기 전 앞부분을 놓친다.
-`--rate 4`처럼 빠르게 재생하면 개발 데스크탑에서도 IMU가 몇 개 유실돼 결과가 달라지므로 기동 확인에만 쓴다.
+`AMtown03.csv`가 생기고 stderr에 처리량 한 줄이 출력
+<details>
+<summary></summary>
 
 ## MSCEqF에서 바뀐 것
 
@@ -171,12 +168,7 @@ ros2 run vio_node run_feeder AMtown03
 | `src/engine/msceqf/filter/propagator/propagator.cpp` | IMU 버퍼가 가득 찼을 때의 propagate를 잠금 밖으로 | 같은 mutex를 재획득해 영구 정지한다 (카메라가 몇 초 멈추면 도달) |
 | `include/msceqf/msceqf.hpp` | 필터 시각 접근자 추가 | 엔진이 측정을 받아들였는지 호출자가 알 수 없다 |
 | 빌드 | ROS1·native·예제·테스트 경로 제거, Lie++·yaml-cpp 커밋 고정 | |
-
-원본의 ROS2 wrapper는 쓰지 않는다. 노드는 새로 썼다. 원본은 콜백 스레드마다 필터를 돌려 재생 속도에 따라 결과가
-달라졌고, 타임스탬프 nanosec 변환에 오류가 있었다.
-
-우리가 새로 쓴 것: keyframe 게이트 front-end(`gated_frontend.cpp`), 파이프라인(`pipeline.cpp`), 오프라인 러너(`run_feeder.cpp`),
-ROS2 노드(`vio_node.cpp`), 10 Hz 전파 출력.
+</details>
 
 ## Future Work
 - **Confidence Scrore**
