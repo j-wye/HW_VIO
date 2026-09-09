@@ -80,14 +80,19 @@ target_include_directories(vio_engine PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 # yaml-cpp는 PRIVATE로 묶고 심볼을 감춘다. ROS(rosbag2)가 시스템 yaml-cpp 0.7.0을 같은 프로세스에
-# 올리는데, 우리가 정적으로 품은 0.9.0을 밖으로 내보내면 심볼 interposition으로 rosbag2의 호출이
-# 우리 구현으로 넘어온다 -- 헤더는 0.7.0, 구현은 0.9.0이라 ABI가 어긋난다.
-# --exclude-libs가 정적 아카이브에서 온 심볼을 로컬로 만들어 두 버전이 서로를 보지 못하게 한다.
+# 올리는데, 우리가 정적으로 품은 0.9.0을 밖으로 내보내면 동적 링커가 둘을 섞는다 -- 헤더는 0.7.0,
+# 구현은 0.9.0이라 ABI가 어긋난다.
+#   --exclude-libs : 정적 아카이브에서 온 심볼을 로컬로 만든다.
+#   version script : 아카이브가 아니라 엔진 자기 오브젝트에 인라인 실체화된 것까지 마저 막는다.
+#                    ld는 패턴 필터를 파일로만 받으므로 빌드 트리에 만들어 넘긴다. file(WRITE)가
+#                    아니라 file(GENERATE)여야 한다 -- 내용이 같으면 파일을 건드리지 않아서
+#                    재configure마다 LTO 재링크가 도는 것을 막는다.
 target_link_libraries(vio_engine
   PUBLIC  LiePlusPlus Eigen3::Eigen ${Boost_LIBRARIES} ${OpenCV_LIBRARIES}
   PRIVATE yaml-cpp::yaml-cpp)
 target_compile_options(vio_engine PRIVATE ${ENGINE_FLAGS})
-set(VIO_ENGINE_SYMBOL_MAP ${CMAKE_CURRENT_SOURCE_DIR}/cmake/vio_engine_symbols.map)
+set(VIO_ENGINE_SYMBOL_MAP ${CMAKE_CURRENT_BINARY_DIR}/vio_engine_symbols.map)
+file(GENERATE OUTPUT ${VIO_ENGINE_SYMBOL_MAP} CONTENT "{ global: *; local: *YAML*; };\n")
 target_link_options(vio_engine PRIVATE ${ENGINE_FLAGS} -Wl,--exclude-libs,ALL
   -Wl,--version-script=${VIO_ENGINE_SYMBOL_MAP})
 set_target_properties(vio_engine PROPERTIES LINK_DEPENDS ${VIO_ENGINE_SYMBOL_MAP})
@@ -103,7 +108,9 @@ target_link_libraries(vio_pipeline vio_engine yaml-cpp::yaml-cpp ${OpenCV_LIBRAR
 add_executable(vio_node src/vio_node.cpp)
 ament_target_dependencies(vio_node rclcpp std_msgs geometry_msgs sensor_msgs nav_msgs)
 target_link_libraries(vio_node vio_pipeline)
-# 실행파일도 기본으로 -rdynamic이 붙어 정적 아카이브 심볼을 내보낸다 -- 같은 이유로 막는다
+# 실행파일에도 필요하다. -rdynamic은 붙지 않지만, 링크된 공유 라이브러리가 UND로 참조하는 심볼은
+# ld가 실행파일에서 export한다. librosbag2_storage.so가 찾는 YAML 심볼을 libyaml-cpp.a가 정의하므로,
+# 막지 않으면 실행파일이(조회 순서 최상단이다) 프로세스 전체에 0.9.0을 강제한다.
 target_link_options(vio_node PRIVATE -Wl,--exclude-libs,ALL)
 
 add_executable(run_feeder src/run_feeder.cpp)
